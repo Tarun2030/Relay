@@ -15,9 +15,10 @@ import { BookingRow } from '@/components/booking-row'
 import { ProjectBoard } from '@/components/project-board'
 import { CalendarEventRow } from '@/components/calendar-event-row'
 import { Badge } from '@/components/ui/badge'
+import { useToast } from '@/components/ui/use-toast'
 import type { Director, Booking, BookingType, CalendarEvent, Project, PushMessage } from '@/types'
 import { bookingTypeLabels, bookingTypeIcons, bookingTypeColors, getDirectorShareUrl, formatRelative, cn } from '@/lib/utils'
-import { ArrowLeft, Copy, Check, RefreshCw, Send, QrCode } from 'lucide-react'
+import { ArrowLeft, Copy, Check, RefreshCw, Send, Trash2, Mail } from 'lucide-react'
 import { QRCodeSVG } from 'qrcode.react'
 
 const BOOKING_TYPES: BookingType[] = ['flight', 'hotel', 'event', 'cab', 'restaurant']
@@ -26,6 +27,7 @@ export default function DirectorDetailPage({ params }: { params: { id: string } 
   const { id } = params
   const router = useRouter()
   const supabase = createClient()
+  const { toast } = useToast()
 
   const [director, setDirector] = useState<Director | null>(null)
   const [bookings, setBookings] = useState<Booking[]>([])
@@ -42,6 +44,9 @@ export default function DirectorDetailPage({ params }: { params: { id: string } 
   const [copied, setCopied] = useState(false)
   const [editingInfo, setEditingInfo] = useState(false)
   const [directorForm, setDirectorForm] = useState({ full_name: '', email: '', title: '', company: '' })
+  const [deletingDirector, setDeletingDirector] = useState(false)
+  const [emailText, setEmailText] = useState('')
+  const [parsingEmail, setParsingEmail] = useState(false)
 
   useEffect(() => {
     async function load() {
@@ -83,7 +88,6 @@ export default function DirectorDetailPage({ params }: { params: { id: string } 
 
     load()
 
-    // Realtime subscription
     const channel = supabase
       .channel(`director-${id}`)
       .on('postgres_changes', { event: '*', schema: 'public', table: 'bookings', filter: `director_id=eq.${id}` }, () => load())
@@ -123,6 +127,18 @@ export default function DirectorDetailPage({ params }: { params: { id: string } 
     setBookings((prev) => prev.filter((b) => b.id !== bookingId))
   }
 
+  async function handleDeleteDirector() {
+    if (!confirm(`Delete ${director?.full_name}? This will remove all their bookings, projects, and data. This cannot be undone.`)) return
+    setDeletingDirector(true)
+    const res = await fetch(`/api/directors/${id}`, { method: 'DELETE' })
+    if (res.ok) {
+      router.push('/dashboard')
+    } else {
+      toast({ title: 'Failed to delete director', variant: 'destructive' })
+      setDeletingDirector(false)
+    }
+  }
+
   async function handleSendPush() {
     if (!pushMessage.trim()) return
     setSendingPush(true)
@@ -141,15 +157,56 @@ export default function DirectorDetailPage({ params }: { params: { id: string } 
 
   async function handleSync() {
     setSyncing(true)
-    await fetch(`/api/calendar/sync?director_id=${id}`)
+    const res = await fetch(`/api/calendar/sync?director_id=${id}`)
+    const data = await res.json()
     setSyncing(false)
-    // Refresh events
-    const { data } = await supabase
+    if (!res.ok) {
+      toast({
+        title: 'Calendar sync failed',
+        description: data.error || 'Unknown error',
+        variant: 'destructive',
+      })
+      return
+    }
+    const { data: events } = await supabase
       .from('calendar_events')
       .select('*')
       .eq('director_id', id)
       .order('start_time', { ascending: true })
-    setCalendarEvents(data || [])
+    setCalendarEvents(events || [])
+    toast({ title: `Synced ${data.synced} meeting${data.synced !== 1 ? 's' : ''}` })
+  }
+
+  async function handleParseEmail() {
+    if (!emailText.trim()) return
+    setParsingEmail(true)
+    const res = await fetch('/api/email/parse', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ raw_email_text: emailText.trim(), director_id: id }),
+    })
+    const parsed = await res.json()
+    if (!res.ok) {
+      toast({ title: 'Failed to parse email', description: parsed.error || 'Unknown error', variant: 'destructive' })
+      setParsingEmail(false)
+      return
+    }
+    // Create the booking from parsed data
+    const createRes = await fetch('/api/bookings', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ ...parsed, director_id: id }),
+    })
+    if (createRes.ok) {
+      const created = await createRes.json()
+      setBookings((prev) => [...prev, created].sort((a, b) => a.date.localeCompare(b.date)))
+      setEmailText('')
+      toast({ title: 'Booking created from email' })
+    } else {
+      const err = await createRes.json()
+      toast({ title: 'Parsed but failed to save booking', description: err.error, variant: 'destructive' })
+    }
+    setParsingEmail(false)
   }
 
   async function handleSaveDirectorInfo() {
@@ -201,6 +258,16 @@ export default function DirectorDetailPage({ params }: { params: { id: string } 
           <h1 className="text-2xl font-bold">{director.full_name}</h1>
           {director.title && <p className="text-muted-foreground">{director.title}{director.company ? ` · ${director.company}` : ''}</p>}
         </div>
+        <Button
+          variant="outline"
+          size="sm"
+          className="gap-2 text-destructive hover:text-destructive border-destructive/30 hover:bg-destructive/5"
+          onClick={handleDeleteDirector}
+          disabled={deletingDirector}
+        >
+          <Trash2 className="h-4 w-4" />
+          {deletingDirector ? 'Deleting...' : 'Delete Director'}
+        </Button>
       </div>
 
       <div className="grid lg:grid-cols-5 gap-6">
@@ -317,6 +384,34 @@ export default function DirectorDetailPage({ params }: { params: { id: string } 
                   ))}
                 </div>
               )}
+            </CardContent>
+          </Card>
+
+          {/* Parse Email */}
+          <Card>
+            <CardHeader className="pb-3">
+              <CardTitle className="text-base flex items-center gap-2">
+                <Mail className="h-4 w-4" />
+                Parse Email Booking
+              </CardTitle>
+            </CardHeader>
+            <CardContent className="space-y-3">
+              <Textarea
+                value={emailText}
+                onChange={(e) => setEmailText(e.target.value)}
+                placeholder="Paste a booking confirmation email here and AI will extract the details automatically..."
+                className="min-h-[100px] text-sm"
+              />
+              <Button
+                size="sm"
+                variant="outline"
+                className="w-full gap-2"
+                onClick={handleParseEmail}
+                disabled={parsingEmail || !emailText.trim()}
+              >
+                <Mail className="h-4 w-4" />
+                {parsingEmail ? 'Parsing...' : 'Parse & Create Booking'}
+              </Button>
             </CardContent>
           </Card>
 
