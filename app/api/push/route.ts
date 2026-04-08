@@ -29,6 +29,7 @@ export async function POST(request: Request) {
   return NextResponse.json(data, { status: 201 })
 }
 
+// Uses service client so the unauthenticated public director page can mark messages as read
 export async function PATCH(request: Request) {
   const supabase = await createServiceClient()
   const url = new URL(request.url)
