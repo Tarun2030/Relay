@@ -1,6 +1,6 @@
 'use client'
 
-import { useEffect, useState, use } from 'react'
+import { useEffect, useState } from 'react'
 import { useRouter } from 'next/navigation'
 import Link from 'next/link'
 import { createClient } from '@/lib/supabase/client'
@@ -22,8 +22,8 @@ import { QRCodeSVG } from 'qrcode.react'
 
 const BOOKING_TYPES: BookingType[] = ['flight', 'hotel', 'event', 'cab', 'restaurant']
 
-export default function DirectorDetailPage({ params }: { params: Promise<{ id: string }> }) {
-  const { id } = use(params)
+export default function DirectorDetailPage({ params }: { params: { id: string } }) {
+  const { id } = params
   const router = useRouter()
   const supabase = createClient()
 
