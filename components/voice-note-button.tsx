@@ -15,13 +15,8 @@ interface VoiceNoteButtonProps {
 
 type State = 'idle' | 'recording' | 'reviewing' | 'sending' | 'sent'
 
-// Minimal shim so TS knows about the Web Speech API
-declare global {
-  interface Window {
-    SpeechRecognition: typeof SpeechRecognition
-    webkitSpeechRecognition: typeof SpeechRecognition
-  }
-}
+// eslint-disable-next-line @typescript-eslint/no-explicit-any
+type AnySpeechRecognition = any
 
 export function VoiceNoteButton({
   directorId,
@@ -34,17 +29,20 @@ export function VoiceNoteButton({
   const [interimText, setInterimText] = useState('')
   const [editedText, setEditedText] = useState('')
   const [supported, setSupported] = useState(true)
-  const recognitionRef = useRef<SpeechRecognition | null>(null)
+  const recognitionRef = useRef<AnySpeechRecognition>(null)
 
   useEffect(() => {
     if (typeof window !== 'undefined') {
-      const SR = window.SpeechRecognition || window.webkitSpeechRecognition
-      if (!SR) setSupported(false)
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      const w = window as any
+      if (!w.SpeechRecognition && !w.webkitSpeechRecognition) setSupported(false)
     }
   }, [])
 
   function startRecording() {
-    const SR = window.SpeechRecognition || window.webkitSpeechRecognition
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    const w = window as any
+    const SR = w.SpeechRecognition || w.webkitSpeechRecognition
     if (!SR) {
       // Fallback: open review panel with empty text input
       setFinalText('')
@@ -60,7 +58,8 @@ export function VoiceNoteButton({
 
     let accumulated = ''
 
-    recognition.onresult = (event: SpeechRecognitionEvent) => {
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    recognition.onresult = (event: any) => {
       let interim = ''
       for (let i = event.resultIndex; i < event.results.length; i++) {
         const result = event.results[i]
