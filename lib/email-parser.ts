@@ -8,17 +8,15 @@ export interface ParsedBooking {
   details: Record<string, unknown>
 }
 
-export async function parseEmailToBooking(rawEmailText: string): Promise<ParsedBooking> {
-  const parsed = await parseBookingEmail(rawEmailText)
+export async function parseEmailToBookings(rawEmailText: string): Promise<ParsedBooking[]> {
+  const items = await parseBookingEmail(rawEmailText)
 
-  if (!parsed.type || !parsed.date || !parsed.details) {
-    throw new Error('Invalid booking data parsed from email')
-  }
-
-  return {
-    type: parsed.type as BookingType,
-    date: parsed.date,
-    end_date: parsed.end_date,
-    details: parsed.details,
-  }
+  return items
+    .filter((p: ParsedBooking) => p.type && p.date && p.details)
+    .map((p: ParsedBooking) => ({
+      type: p.type as BookingType,
+      date: p.date,
+      end_date: p.end_date,
+      details: p.details,
+    }))
 }
