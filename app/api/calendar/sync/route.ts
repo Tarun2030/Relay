@@ -54,18 +54,24 @@ export async function GET(request: Request) {
   try {
     const events = await getCalendarEvents(access_token, refresh_token)
 
-    const upsertData = events.map((event) => ({
-      director_id: directorId,
-      google_event_id: event.id,
-      title: event.summary || 'Untitled',
-      start_time: event.start?.dateTime || event.start?.date || new Date().toISOString(),
-      end_time: event.end?.dateTime || event.end?.date || new Date().toISOString(),
-      location: event.location || null,
-      description: event.description || null,
-      meeting_link: extractMeetingLink(event.description, event.hangoutLink) || null,
-      attendees: (event.attendees || []).map((a) => a.email || '').filter(Boolean),
-      synced_at: new Date().toISOString(),
-    }))
+    const upsertData = events.map((event) => {
+      // All-day events only have a `date` (YYYY-MM-DD), not `dateTime`.
+      // Store them as midnight UTC so they display as a date without a broken time.
+      const startRaw = event.start?.dateTime || (event.start?.date ? `${event.start.date}T00:00:00` : null) || new Date().toISOString()
+      const endRaw   = event.end?.dateTime   || (event.end?.date   ? `${event.end.date}T00:00:00`   : null) || new Date().toISOString()
+      return {
+        director_id: directorId,
+        google_event_id: event.id,
+        title: event.summary || 'Untitled',
+        start_time: startRaw,
+        end_time: endRaw,
+        location: event.location || null,
+        description: event.description || null,
+        meeting_link: extractMeetingLink(event.description, event.hangoutLink) || null,
+        attendees: (event.attendees || []).map((a) => a.email || '').filter(Boolean),
+        synced_at: new Date().toISOString(),
+      }
+    })
 
     if (upsertData.length > 0) {
       await supabase

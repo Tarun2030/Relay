@@ -123,15 +123,14 @@ export function VoiceNoteButton({
   }
 
   if (!supported && state === 'idle') {
-    // Show plain text fallback button
     return (
       <button
         onClick={() => { setEditedText(''); setState('reviewing') }}
-        className={`ml-2 px-2 py-0.5 rounded text-xs font-medium opacity-60 hover:opacity-100 transition-opacity flex items-center gap-1 ${colorClass}`}
+        className={`ml-2 flex items-center gap-1 px-2 py-1 rounded-full text-xs font-medium border border-current/20 hover:border-current/40 transition-colors ${colorClass}`}
         title={`Leave a note for ${sectionLabel}`}
       >
         <Mic className="h-3 w-3" />
-        Note
+        <span>Note</span>
       </button>
     )
   }
@@ -140,10 +139,11 @@ export function VoiceNoteButton({
     return (
       <button
         onClick={startRecording}
-        className={`ml-2 p-1.5 rounded-full opacity-50 hover:opacity-100 transition-opacity ${colorClass}`}
+        className={`ml-2 flex items-center gap-1 px-2 py-1 rounded-full text-xs font-medium border border-current/20 hover:border-current/40 transition-colors ${colorClass}`}
         title={`Voice note for ${sectionLabel}`}
       >
-        <Mic className="h-3.5 w-3.5" />
+        <Mic className="h-3 w-3" />
+        <span>Note</span>
       </button>
     )
   }
