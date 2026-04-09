@@ -28,7 +28,7 @@ const CAT = {
 type Category = keyof typeof CAT
 
 // ─── Filter tabs ───────────────────────────────────────────────────────────────
-type FilterTab = 'all' | 'flights' | 'hotels' | 'events' | 'transfers' | 'dining'
+type FilterTab = 'all' | 'flights' | 'hotels' | 'events' | 'transfers' | 'dining' | 'projects'
 const TABS: { id: FilterTab; label: string }[] = [
   { id: 'all',       label: 'All'       },
   { id: 'flights',   label: 'Flights'   },
@@ -36,6 +36,7 @@ const TABS: { id: FilterTab; label: string }[] = [
   { id: 'events',    label: 'Events'    },
   { id: 'transfers', label: 'Transfers' },
   { id: 'dining',    label: 'Dining'    },
+  { id: 'projects',  label: 'Projects'  },
 ]
 
 // ─── Status styles ─────────────────────────────────────────────────────────────
@@ -596,8 +597,8 @@ export function DirectorView({
           </Section>
         )}
 
-        {/* ── Projects — always visible regardless of tab ── */}
-        {activeTab === 'all' && (
+        {/* ── Projects ── */}
+        {(activeTab === 'all' || activeTab === 'projects') && (
           <Section icon="📁" title="Active Projects" section="projects" directorId={director.id} category="projects" itemCount={activeProjects.length}>
             {activeProjects.length === 0 ? <Empty /> : (
               <>
