@@ -16,9 +16,9 @@ import { ProjectBoard } from '@/components/project-board'
 import { CalendarEventRow } from '@/components/calendar-event-row'
 import { Badge } from '@/components/ui/badge'
 import { useToast } from '@/components/ui/use-toast'
-import type { Director, Booking, BookingType, CalendarEvent, Project, PushMessage } from '@/types'
+import type { Director, Booking, BookingType, CalendarEvent, Project, PushMessage, DirectorNote } from '@/types'
 import { bookingTypeLabels, bookingTypeIcons, bookingTypeColors, getDirectorShareUrl, formatRelative, cn } from '@/lib/utils'
-import { ArrowLeft, Copy, Check, RefreshCw, Send, Trash2, Mail } from 'lucide-react'
+import { ArrowLeft, Copy, Check, RefreshCw, Send, Trash2, Mail, Mic } from 'lucide-react'
 import { QRCodeSVG } from 'qrcode.react'
 
 const BOOKING_TYPES: BookingType[] = ['flight', 'hotel', 'event', 'cab', 'restaurant']
@@ -47,19 +47,21 @@ export default function DirectorDetailPage({ params }: { params: { id: string } 
   const [deletingDirector, setDeletingDirector] = useState(false)
   const [emailText, setEmailText] = useState('')
   const [parsingEmail, setParsingEmail] = useState(false)
+  const [directorNotes, setDirectorNotes] = useState<DirectorNote[]>([])
 
   useEffect(() => {
     async function load() {
       const { data: { user } } = await supabase.auth.getUser()
       if (!user) { router.push('/auth/login'); return }
 
-      const [dirRes, eaRes, bookRes, calRes, projRes, msgRes] = await Promise.all([
+      const [dirRes, eaRes, bookRes, calRes, projRes, msgRes, notesRes] = await Promise.all([
         supabase.from('directors').select('*').eq('id', id).eq('ea_id', user.id).single(),
         supabase.from('eas').select('full_name').eq('id', user.id).single(),
         supabase.from('bookings').select('*').eq('director_id', id).order('date', { ascending: true }),
         supabase.from('calendar_events').select('*').eq('director_id', id).order('start_time', { ascending: true }),
         supabase.from('projects').select('*, updates:project_updates(*)').eq('director_id', id).order('created_at', { ascending: false }),
         supabase.from('push_messages').select('*').eq('director_id', id).order('created_at', { ascending: false }).limit(5),
+        supabase.from('director_notes').select('*').eq('director_id', id).order('created_at', { ascending: false }).limit(20),
       ])
 
       if (dirRes.error || !dirRes.data) { router.push('/dashboard'); return }
@@ -83,6 +85,7 @@ export default function DirectorDetailPage({ params }: { params: { id: string } 
       }))
       setProjects(projs)
       setPushMessages(msgRes.data || [])
+      setDirectorNotes(notesRes.data || [])
       setLoading(false)
     }
 
@@ -93,6 +96,9 @@ export default function DirectorDetailPage({ params }: { params: { id: string } 
       .on('postgres_changes', { event: '*', schema: 'public', table: 'bookings', filter: `director_id=eq.${id}` }, () => load())
       .on('postgres_changes', { event: '*', schema: 'public', table: 'calendar_events', filter: `director_id=eq.${id}` }, () => load())
       .on('postgres_changes', { event: '*', schema: 'public', table: 'push_messages', filter: `director_id=eq.${id}` }, () => load())
+      .on('postgres_changes', { event: 'INSERT', schema: 'public', table: 'director_notes', filter: `director_id=eq.${id}` }, (payload) => {
+        setDirectorNotes((prev) => [payload.new as DirectorNote, ...prev].slice(0, 20))
+      })
       .subscribe()
 
     return () => { supabase.removeChannel(channel) }
@@ -227,6 +233,11 @@ export default function DirectorDetailPage({ params }: { params: { id: string } 
     await navigator.clipboard.writeText(getDirectorShareUrl(director.share_token))
     setCopied(true)
     setTimeout(() => setCopied(false), 2000)
+  }
+
+  async function handleMarkNoteRead(noteId: string) {
+    await fetch(`/api/director-notes?id=${noteId}`, { method: 'PATCH' })
+    setDirectorNotes((prev) => prev.map((n) => n.id === noteId ? { ...n, is_read: true } : n))
   }
 
   if (loading) {
@@ -386,6 +397,57 @@ export default function DirectorDetailPage({ params }: { params: { id: string } 
               )}
             </CardContent>
           </Card>
+
+          {/* Director Notes (voice notes from director) */}
+          {directorNotes.length > 0 && (
+            <Card>
+              <CardHeader className="pb-3">
+                <CardTitle className="text-base flex items-center gap-2">
+                  <Mic className="h-4 w-4 text-violet-500" />
+                  Notes from Director
+                  {directorNotes.some((n) => !n.is_read) && (
+                    <span className="ml-auto text-xs font-normal bg-violet-100 text-violet-700 px-2 py-0.5 rounded-full">
+                      {directorNotes.filter((n) => !n.is_read).length} new
+                    </span>
+                  )}
+                </CardTitle>
+              </CardHeader>
+              <CardContent className="space-y-2">
+                {directorNotes.map((note) => (
+                  <div
+                    key={note.id}
+                    className={cn(
+                      'text-xs p-2.5 rounded-md border-l-2',
+                      note.is_read
+                        ? 'bg-muted border-muted-foreground/20'
+                        : 'bg-violet-50 border-violet-400'
+                    )}
+                  >
+                    <div className="flex items-start justify-between gap-2">
+                      <div className="flex-1 min-w-0">
+                        <p className="font-medium text-xs text-muted-foreground uppercase tracking-wide mb-0.5">
+                          {note.section}
+                        </p>
+                        <p className={note.is_read ? 'text-muted-foreground' : 'text-foreground font-medium'}>
+                          {note.note}
+                        </p>
+                        <p className="text-muted-foreground mt-1">{formatRelative(note.created_at)}</p>
+                      </div>
+                      {!note.is_read && (
+                        <button
+                          onClick={() => handleMarkNoteRead(note.id)}
+                          className="text-muted-foreground hover:text-foreground shrink-0 mt-0.5"
+                          title="Mark as read"
+                        >
+                          <Check className="h-3.5 w-3.5" />
+                        </button>
+                      )}
+                    </div>
+                  </div>
+                ))}
+              </CardContent>
+            </Card>
+          )}
 
           {/* Parse Email */}
           <Card>
