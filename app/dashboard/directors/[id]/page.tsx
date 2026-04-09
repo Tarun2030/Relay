@@ -191,27 +191,17 @@ export default function DirectorDetailPage({ params }: { params: { id: string } 
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ raw_email_text: emailText.trim(), director_id: id }),
     })
-    const parsed = await res.json()
+    const data = await res.json()
     if (!res.ok) {
-      toast({ title: 'Failed to parse email', description: parsed.error || 'Unknown error', variant: 'destructive' })
+      toast({ title: 'Failed to parse email', description: data.error || 'Unknown error', variant: 'destructive' })
       setParsingEmail(false)
       return
     }
-    // Create the booking from parsed data
-    const createRes = await fetch('/api/bookings', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ ...parsed, director_id: id }),
-    })
-    if (createRes.ok) {
-      const created = await createRes.json()
-      setBookings((prev) => [...prev, created].sort((a, b) => a.date.localeCompare(b.date)))
-      setEmailText('')
-      toast({ title: 'Booking created from email' })
-    } else {
-      const err = await createRes.json()
-      toast({ title: 'Parsed but failed to save booking', description: err.error, variant: 'destructive' })
-    }
+    // data is now an array of created bookings
+    const created: Booking[] = Array.isArray(data) ? data : [data]
+    setBookings((prev) => [...prev, ...created].sort((a, b) => a.date.localeCompare(b.date)))
+    setEmailText('')
+    toast({ title: `${created.length} booking${created.length !== 1 ? 's' : ''} created from email` })
     setParsingEmail(false)
   }
 

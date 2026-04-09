@@ -1,6 +1,6 @@
 import { NextResponse } from 'next/server'
 import { createClient } from '@/lib/supabase/server'
-import { parseEmailToBooking } from '@/lib/email-parser'
+import { parseEmailToBookings } from '@/lib/email-parser'
 
 export async function POST(request: Request) {
   const supabase = await createClient()
@@ -24,8 +24,28 @@ export async function POST(request: Request) {
   if (!director) return NextResponse.json({ error: 'Director not found' }, { status: 404 })
 
   try {
-    const parsed = await parseEmailToBooking(raw_email_text)
-    return NextResponse.json(parsed)
+    const parsedItems = await parseEmailToBookings(raw_email_text)
+
+    if (parsedItems.length === 0) {
+      return NextResponse.json({ error: 'No bookings found in this email' }, { status: 422 })
+    }
+
+    // Insert all bookings
+    const { data: created, error } = await supabase
+      .from('bookings')
+      .insert(parsedItems.map((item) => ({
+        director_id,
+        type: item.type,
+        date: item.date,
+        end_date: item.end_date || null,
+        details: item.details,
+        parsed_from_email: true,
+      })))
+      .select()
+
+    if (error) return NextResponse.json({ error: error.message }, { status: 500 })
+
+    return NextResponse.json(created, { status: 201 })
   } catch (err) {
     const message = err instanceof Error ? err.message : 'Parse failed'
     return NextResponse.json({ error: message }, { status: 500 })
