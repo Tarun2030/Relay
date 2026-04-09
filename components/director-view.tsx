@@ -16,15 +16,6 @@ import {
 import { ExternalLink, ChevronDown, MapPin } from 'lucide-react'
 
 // ─── Design tokens ─────────────────────────────────────────────────────────────
-// Brand / Primary  Indigo  #6366F1
-// Flights          Blue    #3B82F6   bg #EFF6FF
-// Hotels           Violet  #8B5CF6   bg #F5F3FF
-// Events           Orange  #F97316   bg #FFF7ED
-// Transfers        Teal    #14B8A6   bg #F0FDFA
-// Dining           Pink    #EC4899   bg #FDF2F8
-// Meetings         Indigo  #6366F1   bg #EEF2FF
-// Status Green     #16A34A  Status Amber #D97706  Status Red #DC2626
-
 const CAT = {
   meetings:  { border: 'border-l-indigo-500', bg: 'bg-indigo-50/60',  icon: 'text-indigo-500',  divider: 'border-indigo-100',  ring: 'ring-indigo-200/60'  },
   flights:   { border: 'border-l-blue-500',   bg: 'bg-blue-50/60',    icon: 'text-blue-500',    divider: 'border-blue-100',    ring: 'ring-blue-200/60'    },
@@ -36,6 +27,18 @@ const CAT = {
 } as const
 type Category = keyof typeof CAT
 
+// ─── Filter tabs ───────────────────────────────────────────────────────────────
+type FilterTab = 'all' | 'flights' | 'hotels' | 'events' | 'transfers' | 'dining'
+const TABS: { id: FilterTab; label: string }[] = [
+  { id: 'all',       label: 'All'       },
+  { id: 'flights',   label: 'Flights'   },
+  { id: 'hotels',    label: 'Hotels'    },
+  { id: 'events',    label: 'Events'    },
+  { id: 'transfers', label: 'Transfers' },
+  { id: 'dining',    label: 'Dining'    },
+]
+
+// ─── Status styles ─────────────────────────────────────────────────────────────
 const BOOKING_STATUS: Record<string, string> = {
   confirmed: 'bg-green-100 text-green-700 border border-green-300',
   pending:   'bg-amber-100 text-amber-700 border border-amber-300',
@@ -63,41 +66,27 @@ function StatusBadge({ status }: { status: string }) {
   )
 }
 
-// ─── Expandable card ───────────────────────────────────────────────────────────
-// Uses CSS grid-rows 0fr→1fr trick for smooth height animation with no JS measurement
+// ─── Expandable booking card ───────────────────────────────────────────────────
 function ExpandableCard({
   id, category, expanded, onToggle, past = false, badge, primary, secondary,
 }: {
-  id: string
-  category: Category
-  expanded: boolean
-  onToggle: (id: string) => void
-  past?: boolean
-  badge: React.ReactNode
-  primary: React.ReactNode
-  secondary: React.ReactNode
+  id: string; category: Category; expanded: boolean
+  onToggle: (id: string) => void; past?: boolean
+  badge: React.ReactNode; primary: React.ReactNode; secondary: React.ReactNode
 }) {
   const { border, bg, divider, ring } = CAT[category]
   return (
     <div
       onClick={() => onToggle(id)}
       className={cn(
-        // Layout
         'rounded-xl border border-gray-100/80 border-l-[3px] p-4 cursor-pointer select-none',
-        // Colors
         border, bg,
-        // Depth — default shadow, hover: stronger shadow + 2px lift
-        'shadow-sm',
-        'hover:shadow-[0_4px_18px_rgba(0,0,0,0.09)] hover:-translate-y-[2px]',
-        // Expanded state: elevated + ring accent
+        'shadow-sm hover:shadow-[0_4px_18px_rgba(0,0,0,0.09)] hover:-translate-y-[2px]',
         expanded && ['shadow-[0_6px_24px_rgba(0,0,0,0.11)] -translate-y-[1px]', 'ring-1', ring],
-        // Transition — fast for hover, slightly slower for elevation changes
         'transition-all duration-150 ease-out',
-        // Past items
         past && 'opacity-35',
       )}
     >
-      {/* Primary row — always visible */}
       <div className="flex items-start justify-between gap-3">
         <div className="flex-1 min-w-0">{primary}</div>
         <div className="flex items-center gap-2 shrink-0 mt-0.5">
@@ -108,17 +97,15 @@ function ExpandableCard({
           )} />
         </div>
       </div>
-
-      {/* Secondary row — smooth height + fade reveal */}
+      {/* CSS grid-rows 0fr→1fr: smooth height with no JS measurement */}
       <div className={cn(
         'grid transition-all duration-200 ease-in-out',
         expanded ? 'grid-rows-[1fr]' : 'grid-rows-[0fr]',
       )}>
         <div className="overflow-hidden min-h-0">
           <div className={cn(
-            'pt-3 mt-3 border-t',
+            'pt-3 mt-3 border-t transition-opacity duration-150',
             divider,
-            'transition-opacity duration-150',
             expanded ? 'opacity-100' : 'opacity-0',
           )}>
             {secondary}
@@ -129,7 +116,7 @@ function ExpandableCard({
   )
 }
 
-// ─── Static hoverable card (meetings — no expandable extra data) ───────────────
+// ─── Static hoverable card (meetings) ─────────────────────────────────────────
 function HoverCard({ category, children }: { category: Category; children: React.ReactNode }) {
   const { border, bg } = CAT[category]
   return (
@@ -144,21 +131,39 @@ function HoverCard({ category, children }: { category: Category; children: React
   )
 }
 
-// ─── Section wrapper ───────────────────────────────────────────────────────────
+// ─── Section wrapper with collapsible behaviour ────────────────────────────────
+const COLLAPSE_THRESHOLD = 3   // only show toggle if more than this many items
+
 function Section({
-  icon, title, section, directorId, category, children,
+  icon, title, section, directorId, category, itemCount, children,
 }: {
   icon: string; title: string; section: string
-  directorId: string; category: Category; children: React.ReactNode
+  directorId: string; category: Category
+  itemCount: number          // pass the number of visible items so Section knows whether to offer collapse
+  children: React.ReactNode
 }) {
+  const [open, setOpen] = useState(true)
   const { icon: iconColor } = CAT[category]
+  const canCollapse = itemCount > COLLAPSE_THRESHOLD
+
   return (
     <section className="space-y-2.5">
+      {/* Sticky header */}
       <div className="flex items-center justify-between py-1.5 sticky top-0 bg-[#F7F8FA]/95 backdrop-blur-sm z-10">
-        <h2 className="text-sm font-semibold text-gray-800 flex items-center gap-2">
+        <button
+          className="flex items-center gap-2 group"
+          onClick={() => canCollapse && setOpen((v) => !v)}
+          style={{ cursor: canCollapse ? 'pointer' : 'default' }}
+        >
           <span className={cn('text-[15px]', iconColor)}>{icon}</span>
-          {title}
-        </h2>
+          <h2 className="text-sm font-semibold text-gray-800">{title}</h2>
+          {canCollapse && (
+            <ChevronDown className={cn(
+              'h-3.5 w-3.5 text-gray-400 transition-transform duration-200 ml-0.5',
+              open ? 'rotate-180' : 'rotate-0',
+            )} />
+          )}
+        </button>
         <VoiceNoteButton
           directorId={directorId}
           section={section as never}
@@ -166,7 +171,21 @@ function Section({
           colorClass="text-indigo-500 hover:text-indigo-700 hover:bg-indigo-50"
         />
       </div>
-      {children}
+
+      {/* Section body — collapses if over threshold */}
+      <div className={cn(
+        'grid transition-all duration-200 ease-in-out',
+        open ? 'grid-rows-[1fr]' : 'grid-rows-[0fr]',
+      )}>
+        <div className="overflow-hidden min-h-0">
+          <div className={cn(
+            'space-y-2.5 transition-opacity duration-150',
+            open ? 'opacity-100' : 'opacity-0',
+          )}>
+            {children}
+          </div>
+        </div>
+      </div>
     </section>
   )
 }
@@ -186,13 +205,8 @@ function PastToggle({ count, noun, show, onToggle }: { count: number; noun: stri
   )
 }
 
-// ─── Metadata row (inside expanded panel) ─────────────────────────────────────
 function MetaRow({ children }: { children: React.ReactNode }) {
-  return (
-    <div className="flex flex-wrap gap-x-4 gap-y-1 text-xs text-gray-500">
-      {children}
-    </div>
-  )
+  return <div className="flex flex-wrap gap-x-4 gap-y-1 text-xs text-gray-500">{children}</div>
 }
 function MetaItem({ label, value, mono = false }: { label: string; value?: string | null; mono?: boolean }) {
   if (!value) return null
@@ -219,14 +233,18 @@ export function DirectorView({
   initialProjects, initialPushMessages,
 }: DirectorViewProps) {
   const supabase = createClient()
-  const [bookings, setBookings]   = useState(initialBookings)
-  const [events, setEvents]       = useState(initialCalendarEvents)
-  const [projects, setProjects]   = useState(initialProjects)
-  const [messages, setMessages]   = useState(initialPushMessages)
+  const [bookings,  setBookings]  = useState(initialBookings)
+  const [events,    setEvents]    = useState(initialCalendarEvents)
+  const [projects,  setProjects]  = useState(initialProjects)
+  const [messages,  setMessages]  = useState(initialPushMessages)
   const [showPastFlights, setShowPastFlights] = useState(false)
   const [showPastHotels,  setShowPastHotels]  = useState(false)
-  const [expandedCards, setExpandedCards]     = useState<Set<string>>(new Set())
-  const [expandedProjects, setExpandedProjects] = useState<Set<string>>(new Set())
+  // Only one booking card open at a time
+  const [activeCard,    setActiveCard]    = useState<string | null>(null)
+  // Only one project open at a time
+  const [activeProject, setActiveProject] = useState<string | null>(null)
+  // Filter tab
+  const [activeTab, setActiveTab] = useState<FilterTab>('all')
 
   useEffect(() => {
     const channel = supabase
@@ -244,22 +262,15 @@ export function DirectorView({
     return () => { supabase.removeChannel(channel) }
   }, [director.id])
 
+  // Toggle: collapse any open card when switching to a different one
   function toggleCard(id: string) {
-    setExpandedCards((prev) => {
-      const next = new Set(prev)
-      next.has(id) ? next.delete(id) : next.add(id)
-      return next
-    })
+    setActiveCard((prev) => prev === id ? null : id)
   }
   function toggleProject(id: string) {
-    setExpandedProjects((prev) => {
-      const next = new Set(prev)
-      next.has(id) ? next.delete(id) : next.add(id)
-      return next
-    })
+    setActiveProject((prev) => prev === id ? null : id)
   }
 
-  const sorted   = (arr: Booking[]) => [...arr].sort((a, b) => a.date.localeCompare(b.date))
+  const sorted      = (arr: Booking[]) => [...arr].sort((a, b) => a.date.localeCompare(b.date))
   const flights     = sorted(bookings.filter((b) => b.type === 'flight'))
   const hotels      = sorted(bookings.filter((b) => b.type === 'hotel'))
   const eventBkgs   = sorted(bookings.filter((b) => b.type === 'event'))
@@ -282,11 +293,14 @@ export function DirectorView({
     ...projects.map((p) => p.updated_at),
   ].filter(Boolean).map((d) => new Date(d).getTime()).sort((a, b) => b - a)[0]
 
+  // Which sections are visible based on active tab
+  const show = (tab: FilterTab) => activeTab === 'all' || activeTab === tab
+
   return (
     <div className="min-h-screen bg-[#F7F8FA]">
       <PushMessageBanner messages={messages} />
 
-      <div className="max-w-2xl mx-auto px-5 py-8 space-y-8">
+      <div className="max-w-2xl mx-auto px-5 py-8 space-y-6">
 
         {/* ── Header ── */}
         <div className="pb-4 border-b border-gray-200/60">
@@ -302,366 +316,376 @@ export function DirectorView({
           </p>
         </div>
 
-        {/* ── This Week ── */}
-        <Section icon="📅" title="This Week" section="meetings" directorId={director.id} category="meetings">
-          {weekMeetings.length === 0 ? <Empty /> : (
-            <div className="space-y-2.5">
-              {weekMeetings.map((event) => (
-                <HoverCard key={event.id} category="meetings">
-                  <div className="flex items-start justify-between gap-3">
-                    <div className="flex-1 min-w-0">
-                      <p className="text-sm font-bold text-gray-900">{event.title}</p>
-                      <div className="flex flex-wrap gap-x-3 text-xs text-gray-500 mt-1">
-                        <span>{formatDate(event.start_time)}</span>
-                        {!event.start_time.endsWith('T00:00:00') && (
-                          <span className="font-semibold text-indigo-600">
-                            {formatTime(event.start_time)} – {formatTime(event.end_time)}
-                          </span>
-                        )}
-                        {event.location && (
-                          <span className="flex items-center gap-1">
-                            <MapPin className="h-3 w-3" />{event.location}
-                          </span>
-                        )}
-                      </div>
+        {/* ── Filter tabs ── */}
+        <div className="flex items-center gap-1 overflow-x-auto pb-0.5 no-scrollbar">
+          {TABS.map((tab) => (
+            <button
+              key={tab.id}
+              onClick={() => setActiveTab(tab.id)}
+              className={cn(
+                'shrink-0 px-3.5 py-1.5 rounded-full text-xs font-semibold transition-all duration-150',
+                activeTab === tab.id
+                  ? 'bg-indigo-600 text-white shadow-sm'
+                  : 'bg-white text-gray-500 border border-gray-200 hover:border-indigo-300 hover:text-indigo-600',
+              )}
+            >
+              {tab.label}
+            </button>
+          ))}
+        </div>
+
+        {/* ── This Week — hidden when a specific booking tab is active ── */}
+        {show('all') && (
+          <Section icon="📅" title="This Week" section="meetings" directorId={director.id} category="meetings" itemCount={weekMeetings.length}>
+            {weekMeetings.length === 0 ? <Empty /> : weekMeetings.map((event) => (
+              <HoverCard key={event.id} category="meetings">
+                <div className="flex items-start justify-between gap-3">
+                  <div className="flex-1 min-w-0">
+                    <p className="text-sm font-bold text-gray-900">{event.title}</p>
+                    <div className="flex flex-wrap gap-x-3 text-xs text-gray-500 mt-1">
+                      <span>{formatDate(event.start_time)}</span>
+                      {!event.start_time.endsWith('T00:00:00') && (
+                        <span className="font-semibold text-indigo-600">
+                          {formatTime(event.start_time)} – {formatTime(event.end_time)}
+                        </span>
+                      )}
+                      {event.location && (
+                        <span className="flex items-center gap-1"><MapPin className="h-3 w-3" />{event.location}</span>
+                      )}
                     </div>
-                    {event.meeting_link && (
-                      <Button
-                        asChild size="sm"
-                        className="h-7 text-xs shrink-0 bg-indigo-600 hover:bg-indigo-700 text-white border-0 gap-1 transition-colors duration-150"
-                        onClick={(e) => e.stopPropagation()}
-                      >
-                        <a href={event.meeting_link} target="_blank" rel="noopener noreferrer">
-                          Join <ExternalLink className="h-3 w-3" />
-                        </a>
-                      </Button>
-                    )}
                   </div>
-                </HoverCard>
-              ))}
-            </div>
-          )}
-        </Section>
+                  {event.meeting_link && (
+                    <Button
+                      asChild size="sm"
+                      className="h-7 text-xs shrink-0 bg-indigo-600 hover:bg-indigo-700 text-white border-0 gap-1 transition-colors duration-150"
+                      onClick={(e) => e.stopPropagation()}
+                    >
+                      <a href={event.meeting_link} target="_blank" rel="noopener noreferrer">
+                        Join <ExternalLink className="h-3 w-3" />
+                      </a>
+                    </Button>
+                  )}
+                </div>
+              </HoverCard>
+            ))}
+          </Section>
+        )}
 
         {/* ── Flights ── */}
-        <Section icon="✈️" title="Flights" section="flights" directorId={director.id} category="flights">
-          {futureFlights.length === 0 && pastFlights.length === 0 ? <Empty /> : (
-            <div className="space-y-2.5">
-              {futureFlights.map((b) => {
-                const f = b.details as FlightDetails
-                return (
-                  <ExpandableCard
-                    key={b.id} id={b.id} category="flights"
-                    expanded={expandedCards.has(b.id)} onToggle={toggleCard}
-                    badge={<StatusBadge status={b.status} />}
-                    primary={
-                      <>
-                        <p className="text-sm font-bold text-gray-900 tracking-tight">{f.origin} → {f.destination}</p>
-                        <div className="flex flex-wrap items-center gap-x-3 mt-1">
-                          <span className="text-xs font-semibold text-blue-600">
-                            {formatTime(f.departure_time)} → {formatTime(f.arrival_time)}
-                          </span>
-                          <span className="text-xs text-gray-400">{formatDate(b.date)}</span>
-                          <span className="text-xs text-gray-400">{f.airline}</span>
-                        </div>
-                      </>
-                    }
-                    secondary={
-                      <MetaRow>
-                        <MetaItem label="PNR" value={f.pnr} mono />
-                        <MetaItem label="Flight" value={f.flight_number} />
-                        <MetaItem label="Seat" value={f.seat} />
-                        <MetaItem label="Class" value={f.class} />
-                        <MetaItem label="Dep. Terminal" value={f.departure_terminal ?? 'NA'} />
-                        <MetaItem label="Arr. Terminal" value={f.arrival_terminal ?? 'NA'} />
-                        <MetaItem label="Gate" value={f.gate} />
-                        <MetaItem label="Passenger" value={f.passenger_name} />
-                      </MetaRow>
-                    }
-                  />
-                )
-              })}
-              {pastFlights.length > 0 && (
-                <PastToggle count={pastFlights.length} noun="flight" show={showPastFlights} onToggle={() => setShowPastFlights(!showPastFlights)} />
-              )}
-              {showPastFlights && pastFlights.map((b) => {
-                const f = b.details as FlightDetails
-                return (
-                  <ExpandableCard
-                    key={b.id} id={b.id} category="flights" past
-                    expanded={expandedCards.has(b.id)} onToggle={toggleCard}
-                    badge={<StatusBadge status={b.status} />}
-                    primary={
-                      <>
-                        <p className="text-sm font-bold text-gray-700">{f.origin} → {f.destination}</p>
-                        <p className="text-xs text-gray-400 mt-0.5">{formatDate(b.date)} · {f.airline} {f.flight_number}</p>
-                      </>
-                    }
-                    secondary={
-                      <MetaRow>
-                        <MetaItem label="PNR" value={f.pnr} mono />
-                        <MetaItem label="Dep. Terminal" value={f.departure_terminal ?? 'NA'} />
-                        <MetaItem label="Arr. Terminal" value={f.arrival_terminal ?? 'NA'} />
-                      </MetaRow>
-                    }
-                  />
-                )
-              })}
-            </div>
-          )}
-        </Section>
+        {show('flights') && (
+          <Section icon="✈️" title="Flights" section="flights" directorId={director.id} category="flights" itemCount={futureFlights.length}>
+            {futureFlights.length === 0 && pastFlights.length === 0 ? <Empty /> : (
+              <>
+                {futureFlights.map((b) => {
+                  const f = b.details as FlightDetails
+                  return (
+                    <ExpandableCard
+                      key={b.id} id={b.id} category="flights"
+                      expanded={activeCard === b.id} onToggle={toggleCard}
+                      badge={<StatusBadge status={b.status} />}
+                      primary={
+                        <>
+                          <p className="text-sm font-bold text-gray-900 tracking-tight">{f.origin} → {f.destination}</p>
+                          <div className="flex flex-wrap items-center gap-x-3 mt-1">
+                            <span className="text-xs font-semibold text-blue-600">
+                              {formatTime(f.departure_time)} → {formatTime(f.arrival_time)}
+                            </span>
+                            <span className="text-xs text-gray-400">{formatDate(b.date)}</span>
+                            <span className="text-xs text-gray-400">{f.airline}</span>
+                          </div>
+                        </>
+                      }
+                      secondary={
+                        <MetaRow>
+                          <MetaItem label="PNR" value={f.pnr} mono />
+                          <MetaItem label="Flight" value={f.flight_number} />
+                          <MetaItem label="Seat" value={f.seat} />
+                          <MetaItem label="Class" value={f.class} />
+                          <MetaItem label="Dep. Terminal" value={f.departure_terminal ?? 'NA'} />
+                          <MetaItem label="Arr. Terminal" value={f.arrival_terminal ?? 'NA'} />
+                          <MetaItem label="Gate" value={f.gate} />
+                          <MetaItem label="Passenger" value={f.passenger_name} />
+                        </MetaRow>
+                      }
+                    />
+                  )
+                })}
+                {pastFlights.length > 0 && (
+                  <PastToggle count={pastFlights.length} noun="flight" show={showPastFlights} onToggle={() => setShowPastFlights(!showPastFlights)} />
+                )}
+                {showPastFlights && pastFlights.map((b) => {
+                  const f = b.details as FlightDetails
+                  return (
+                    <ExpandableCard
+                      key={b.id} id={b.id} category="flights" past
+                      expanded={activeCard === b.id} onToggle={toggleCard}
+                      badge={<StatusBadge status={b.status} />}
+                      primary={
+                        <>
+                          <p className="text-sm font-bold text-gray-700">{f.origin} → {f.destination}</p>
+                          <p className="text-xs text-gray-400 mt-0.5">{formatDate(b.date)} · {f.airline} {f.flight_number}</p>
+                        </>
+                      }
+                      secondary={
+                        <MetaRow>
+                          <MetaItem label="PNR" value={f.pnr} mono />
+                          <MetaItem label="Dep. Terminal" value={f.departure_terminal ?? 'NA'} />
+                          <MetaItem label="Arr. Terminal" value={f.arrival_terminal ?? 'NA'} />
+                        </MetaRow>
+                      }
+                    />
+                  )
+                })}
+              </>
+            )}
+          </Section>
+        )}
 
         {/* ── Hotels ── */}
-        <Section icon="🏨" title="Hotels" section="hotels" directorId={director.id} category="hotels">
-          {futureHotels.length === 0 && pastHotels.length === 0 ? <Empty /> : (
-            <div className="space-y-2.5">
-              {futureHotels.map((b) => {
-                const h = b.details as HotelDetails
-                return (
-                  <ExpandableCard
-                    key={b.id} id={b.id} category="hotels"
-                    expanded={expandedCards.has(b.id)} onToggle={toggleCard}
-                    badge={<StatusBadge status={b.status} />}
-                    primary={
-                      <>
-                        <p className="text-sm font-bold text-gray-900">{h.property_name}</p>
-                        <div className="flex flex-wrap items-center gap-x-3 mt-1">
-                          <span className="text-xs font-semibold text-violet-600">
-                            {formatDate(h.check_in)} → {formatDate(h.check_out)}
-                          </span>
-                          <span className="text-xs text-gray-400">{h.city}</span>
-                        </div>
-                      </>
-                    }
-                    secondary={
-                      <MetaRow>
-                        <MetaItem label="Conf" value={h.confirmation_number} mono />
-                        <MetaItem label="Room" value={h.room_type} />
-                        <MetaItem label="Address" value={h.address} />
-                        <MetaItem label="Contact" value={h.contact_number} />
-                      </MetaRow>
-                    }
-                  />
-                )
-              })}
-              {pastHotels.length > 0 && (
-                <PastToggle count={pastHotels.length} noun="hotel" show={showPastHotels} onToggle={() => setShowPastHotels(!showPastHotels)} />
-              )}
-              {showPastHotels && pastHotels.map((b) => {
-                const h = b.details as HotelDetails
-                return (
-                  <ExpandableCard
-                    key={b.id} id={b.id} category="hotels" past
-                    expanded={expandedCards.has(b.id)} onToggle={toggleCard}
-                    badge={<StatusBadge status={b.status} />}
-                    primary={
-                      <>
-                        <p className="text-sm font-bold text-gray-700">{h.property_name}, {h.city}</p>
-                        <p className="text-xs text-gray-400 mt-0.5">{formatDate(h.check_in)} → {formatDate(h.check_out)}</p>
-                      </>
-                    }
-                    secondary={<MetaItem label="Conf" value={h.confirmation_number} mono />}
-                  />
-                )
-              })}
-            </div>
-          )}
-        </Section>
+        {show('hotels') && (
+          <Section icon="🏨" title="Hotels" section="hotels" directorId={director.id} category="hotels" itemCount={futureHotels.length}>
+            {futureHotels.length === 0 && pastHotels.length === 0 ? <Empty /> : (
+              <>
+                {futureHotels.map((b) => {
+                  const h = b.details as HotelDetails
+                  return (
+                    <ExpandableCard
+                      key={b.id} id={b.id} category="hotels"
+                      expanded={activeCard === b.id} onToggle={toggleCard}
+                      badge={<StatusBadge status={b.status} />}
+                      primary={
+                        <>
+                          <p className="text-sm font-bold text-gray-900">{h.property_name}</p>
+                          <div className="flex flex-wrap items-center gap-x-3 mt-1">
+                            <span className="text-xs font-semibold text-violet-600">
+                              {formatDate(h.check_in)} → {formatDate(h.check_out)}
+                            </span>
+                            <span className="text-xs text-gray-400">{h.city}</span>
+                          </div>
+                        </>
+                      }
+                      secondary={
+                        <MetaRow>
+                          <MetaItem label="Conf" value={h.confirmation_number} mono />
+                          <MetaItem label="Room" value={h.room_type} />
+                          <MetaItem label="Address" value={h.address} />
+                          <MetaItem label="Contact" value={h.contact_number} />
+                        </MetaRow>
+                      }
+                    />
+                  )
+                })}
+                {pastHotels.length > 0 && (
+                  <PastToggle count={pastHotels.length} noun="hotel" show={showPastHotels} onToggle={() => setShowPastHotels(!showPastHotels)} />
+                )}
+                {showPastHotels && pastHotels.map((b) => {
+                  const h = b.details as HotelDetails
+                  return (
+                    <ExpandableCard
+                      key={b.id} id={b.id} category="hotels" past
+                      expanded={activeCard === b.id} onToggle={toggleCard}
+                      badge={<StatusBadge status={b.status} />}
+                      primary={
+                        <>
+                          <p className="text-sm font-bold text-gray-700">{h.property_name}, {h.city}</p>
+                          <p className="text-xs text-gray-400 mt-0.5">{formatDate(h.check_in)} → {formatDate(h.check_out)}</p>
+                        </>
+                      }
+                      secondary={<MetaRow><MetaItem label="Conf" value={h.confirmation_number} mono /></MetaRow>}
+                    />
+                  )
+                })}
+              </>
+            )}
+          </Section>
+        )}
 
         {/* ── Events ── */}
-        <Section icon="🎭" title="Events" section="events" directorId={director.id} category="events">
-          {eventBkgs.length === 0 ? <Empty /> : (
-            <div className="space-y-2.5">
-              {eventBkgs.map((b) => {
-                const e = b.details as EventDetails
-                return (
-                  <ExpandableCard
-                    key={b.id} id={b.id} category="events" past={isPast(b.date)}
-                    expanded={expandedCards.has(b.id)} onToggle={toggleCard}
-                    badge={<StatusBadge status={b.status} />}
-                    primary={
-                      <>
-                        <p className="text-sm font-bold text-gray-900">{e.event_name}</p>
-                        <div className="flex flex-wrap items-center gap-x-3 mt-1">
-                          <span className="text-xs font-semibold text-orange-600">{formatDateTime(e.start_time)}</span>
-                          <span className="text-xs text-gray-400">{e.city}</span>
-                        </div>
-                      </>
-                    }
-                    secondary={
-                      <MetaRow>
-                        <MetaItem label="Venue" value={e.venue} />
-                        <MetaItem label="Ticket" value={e.ticket_number} mono />
-                        <MetaItem label="Seat" value={e.seat} />
-                        <MetaItem label="Dress" value={e.dress_code} />
-                      </MetaRow>
-                    }
-                  />
-                )
-              })}
-            </div>
-          )}
-        </Section>
+        {show('events') && (
+          <Section icon="🎭" title="Events" section="events" directorId={director.id} category="events" itemCount={eventBkgs.length}>
+            {eventBkgs.length === 0 ? <Empty /> : eventBkgs.map((b) => {
+              const e = b.details as EventDetails
+              return (
+                <ExpandableCard
+                  key={b.id} id={b.id} category="events" past={isPast(b.date)}
+                  expanded={activeCard === b.id} onToggle={toggleCard}
+                  badge={<StatusBadge status={b.status} />}
+                  primary={
+                    <>
+                      <p className="text-sm font-bold text-gray-900">{e.event_name}</p>
+                      <div className="flex flex-wrap items-center gap-x-3 mt-1">
+                        <span className="text-xs font-semibold text-orange-600">{formatDateTime(e.start_time)}</span>
+                        <span className="text-xs text-gray-400">{e.city}</span>
+                      </div>
+                    </>
+                  }
+                  secondary={
+                    <MetaRow>
+                      <MetaItem label="Venue" value={e.venue} />
+                      <MetaItem label="Ticket" value={e.ticket_number} mono />
+                      <MetaItem label="Seat" value={e.seat} />
+                      <MetaItem label="Dress" value={e.dress_code} />
+                    </MetaRow>
+                  }
+                />
+              )
+            })}
+          </Section>
+        )}
 
         {/* ── Transfers ── */}
-        <Section icon="🚗" title="Transfers" section="transfers" directorId={director.id} category="transfers">
-          {cabs.length === 0 ? <Empty /> : (
-            <div className="space-y-2.5">
-              {cabs.map((b) => {
-                const c = b.details as CabDetails
-                return (
-                  <ExpandableCard
-                    key={b.id} id={b.id} category="transfers" past={isPast(b.date)}
-                    expanded={expandedCards.has(b.id)} onToggle={toggleCard}
-                    badge={<StatusBadge status={b.status} />}
-                    primary={
-                      <>
-                        <p className="text-sm font-bold text-gray-900">{c.pickup_location} → {c.drop_location}</p>
-                        <div className="flex flex-wrap items-center gap-x-3 mt-1">
-                          <span className="text-xs font-semibold text-teal-600">{formatDateTime(c.pickup_time)}</span>
-                          <span className="text-xs text-gray-400">{c.provider}</span>
-                        </div>
-                      </>
-                    }
-                    secondary={
-                      <MetaRow>
-                        <MetaItem label="Booking ID" value={c.booking_id} mono />
-                        <MetaItem label="Driver" value={c.driver_name} />
-                        <MetaItem label="Contact" value={c.driver_contact} />
-                      </MetaRow>
-                    }
-                  />
-                )
-              })}
-            </div>
-          )}
-        </Section>
+        {show('transfers') && (
+          <Section icon="🚗" title="Transfers" section="transfers" directorId={director.id} category="transfers" itemCount={cabs.length}>
+            {cabs.length === 0 ? <Empty /> : cabs.map((b) => {
+              const c = b.details as CabDetails
+              return (
+                <ExpandableCard
+                  key={b.id} id={b.id} category="transfers" past={isPast(b.date)}
+                  expanded={activeCard === b.id} onToggle={toggleCard}
+                  badge={<StatusBadge status={b.status} />}
+                  primary={
+                    <>
+                      <p className="text-sm font-bold text-gray-900">{c.pickup_location} → {c.drop_location}</p>
+                      <div className="flex flex-wrap items-center gap-x-3 mt-1">
+                        <span className="text-xs font-semibold text-teal-600">{formatDateTime(c.pickup_time)}</span>
+                        <span className="text-xs text-gray-400">{c.provider}</span>
+                      </div>
+                    </>
+                  }
+                  secondary={
+                    <MetaRow>
+                      <MetaItem label="Booking ID" value={c.booking_id} mono />
+                      <MetaItem label="Driver" value={c.driver_name} />
+                      <MetaItem label="Contact" value={c.driver_contact} />
+                    </MetaRow>
+                  }
+                />
+              )
+            })}
+          </Section>
+        )}
 
         {/* ── Dining ── */}
-        <Section icon="🍽️" title="Dining" section="dining" directorId={director.id} category="dining">
-          {restaurants.length === 0 ? <Empty /> : (
-            <div className="space-y-2.5">
-              {restaurants.map((b) => {
-                const r = b.details as RestaurantDetails
-                return (
-                  <ExpandableCard
-                    key={b.id} id={b.id} category="dining" past={isPast(b.date)}
-                    expanded={expandedCards.has(b.id)} onToggle={toggleCard}
-                    badge={<StatusBadge status={b.status} />}
-                    primary={
-                      <>
-                        <p className="text-sm font-bold text-gray-900">{r.restaurant_name}</p>
-                        <div className="flex flex-wrap items-center gap-x-3 mt-1">
-                          <span className="text-xs font-semibold text-pink-600">{formatDateTime(r.reservation_time)}</span>
-                          <span className="text-xs text-gray-400">{r.location}</span>
-                          <span className="text-xs text-gray-400">{r.party_size} guests</span>
-                        </div>
-                      </>
-                    }
-                    secondary={
-                      <MetaRow>
-                        <MetaItem label="Conf" value={r.confirmation_number} mono />
-                      </MetaRow>
-                    }
-                  />
-                )
-              })}
-            </div>
-          )}
-        </Section>
-
-        {/* ── Projects ── */}
-        <Section icon="📁" title="Active Projects" section="projects" directorId={director.id} category="projects">
-          {activeProjects.length === 0 ? <Empty /> : (
-            <div className="space-y-2.5">
-              {activeProjects.map((project) => {
-                const expanded = expandedProjects.has(project.id)
-                const latestUpdate = project.updates?.[0]
-                return (
-                  <div
-                    key={project.id}
-                    className={cn(
-                      'bg-white rounded-xl border border-gray-100/80 border-l-[3px] border-l-slate-400 overflow-hidden',
-                      'shadow-sm hover:shadow-[0_4px_18px_rgba(0,0,0,0.09)] hover:-translate-y-[2px]',
-                      expanded && 'shadow-[0_6px_24px_rgba(0,0,0,0.10)] -translate-y-[1px] ring-1 ring-slate-200/60',
-                      'transition-all duration-150 ease-out',
-                    )}
-                  >
-                    <button
-                      className="w-full flex items-start justify-between gap-3 p-4 text-left hover:bg-slate-50/60 transition-colors duration-100"
-                      onClick={() => toggleProject(project.id)}
-                    >
-                      <div className="flex-1 min-w-0">
-                        <div className="flex items-center gap-2 flex-wrap">
-                          <span className="text-sm font-semibold text-gray-900">{project.name}</span>
-                          <span className={cn(
-                            'inline-flex items-center px-2 py-0.5 rounded-full text-xs font-semibold border',
-                            PROJECT_STATUS[project.status],
-                          )}>
-                            {PROJECT_LABEL[project.status]}
-                          </span>
-                        </div>
-                        {latestUpdate && !expanded && (
-                          <p className="text-xs text-gray-400 mt-1 truncate">{latestUpdate.note}</p>
-                        )}
+        {show('dining') && (
+          <Section icon="🍽️" title="Dining" section="dining" directorId={director.id} category="dining" itemCount={restaurants.length}>
+            {restaurants.length === 0 ? <Empty /> : restaurants.map((b) => {
+              const r = b.details as RestaurantDetails
+              return (
+                <ExpandableCard
+                  key={b.id} id={b.id} category="dining" past={isPast(b.date)}
+                  expanded={activeCard === b.id} onToggle={toggleCard}
+                  badge={<StatusBadge status={b.status} />}
+                  primary={
+                    <>
+                      <p className="text-sm font-bold text-gray-900">{r.restaurant_name}</p>
+                      <div className="flex flex-wrap items-center gap-x-3 mt-1">
+                        <span className="text-xs font-semibold text-pink-600">{formatDateTime(r.reservation_time)}</span>
+                        <span className="text-xs text-gray-400">{r.location}</span>
+                        <span className="text-xs text-gray-400">{r.party_size} guests</span>
                       </div>
-                      <ChevronDown className={cn(
-                        'h-4 w-4 text-gray-400 shrink-0 mt-0.5 transition-transform duration-200',
-                        expanded && 'rotate-180 text-gray-600',
-                      )} />
-                    </button>
+                    </>
+                  }
+                  secondary={
+                    <MetaRow>
+                      <MetaItem label="Conf" value={r.confirmation_number} mono />
+                    </MetaRow>
+                  }
+                />
+              )
+            })}
+          </Section>
+        )}
 
-                    {/* Smooth expand for project updates */}
-                    <div className={cn(
-                      'grid transition-all duration-200 ease-in-out',
-                      expanded ? 'grid-rows-[1fr]' : 'grid-rows-[0fr]',
-                    )}>
-                      <div className="overflow-hidden min-h-0">
-                        <div className={cn(
-                          'border-t border-slate-100 bg-slate-50/60 p-4 space-y-3',
-                          'transition-opacity duration-150',
-                          expanded ? 'opacity-100' : 'opacity-0',
-                        )}>
-                          {project.updates && project.updates.length > 0 ? (
-                            project.updates
-                              .sort((a, b) => new Date(b.created_at).getTime() - new Date(a.created_at).getTime())
-                              .map((update) => (
-                                <div key={update.id}>
-                                  <p className="text-xs text-gray-400 mb-0.5">
-                                    <span className="font-medium text-gray-600">{update.posted_by}</span>
-                                    {' · '}{formatRelative(update.created_at)}
-                                  </p>
-                                  <p className="text-sm text-gray-700">{update.note}</p>
-                                </div>
-                              ))
-                          ) : (
-                            <p className="text-xs text-gray-400">No updates yet</p>
+        {/* ── Projects — always visible regardless of tab ── */}
+        {activeTab === 'all' && (
+          <Section icon="📁" title="Active Projects" section="projects" directorId={director.id} category="projects" itemCount={activeProjects.length}>
+            {activeProjects.length === 0 ? <Empty /> : (
+              <>
+                {activeProjects.map((project) => {
+                  const expanded = activeProject === project.id
+                  const latestUpdate = project.updates?.[0]
+                  return (
+                    <div
+                      key={project.id}
+                      className={cn(
+                        'bg-white rounded-xl border border-gray-100/80 border-l-[3px] border-l-slate-400 overflow-hidden',
+                        'shadow-sm hover:shadow-[0_4px_18px_rgba(0,0,0,0.09)] hover:-translate-y-[2px]',
+                        expanded && 'shadow-[0_6px_24px_rgba(0,0,0,0.10)] -translate-y-[1px] ring-1 ring-slate-200/60',
+                        'transition-all duration-150 ease-out',
+                      )}
+                    >
+                      <button
+                        className="w-full flex items-start justify-between gap-3 p-4 text-left hover:bg-slate-50/60 transition-colors duration-100"
+                        onClick={() => toggleProject(project.id)}
+                      >
+                        <div className="flex-1 min-w-0">
+                          <div className="flex items-center gap-2 flex-wrap">
+                            <span className="text-sm font-semibold text-gray-900">{project.name}</span>
+                            <span className={cn(
+                              'inline-flex items-center px-2 py-0.5 rounded-full text-xs font-semibold border',
+                              PROJECT_STATUS[project.status],
+                            )}>
+                              {PROJECT_LABEL[project.status]}
+                            </span>
+                          </div>
+                          {latestUpdate && !expanded && (
+                            <p className="text-xs text-gray-400 mt-1 truncate">{latestUpdate.note}</p>
                           )}
+                        </div>
+                        <ChevronDown className={cn(
+                          'h-4 w-4 text-gray-400 shrink-0 mt-0.5 transition-transform duration-200',
+                          expanded && 'rotate-180 text-gray-600',
+                        )} />
+                      </button>
+                      <div className={cn(
+                        'grid transition-all duration-200 ease-in-out',
+                        expanded ? 'grid-rows-[1fr]' : 'grid-rows-[0fr]',
+                      )}>
+                        <div className="overflow-hidden min-h-0">
+                          <div className={cn(
+                            'border-t border-slate-100 bg-slate-50/60 p-4 space-y-3 transition-opacity duration-150',
+                            expanded ? 'opacity-100' : 'opacity-0',
+                          )}>
+                            {project.updates && project.updates.length > 0 ? (
+                              project.updates
+                                .sort((a, b) => new Date(b.created_at).getTime() - new Date(a.created_at).getTime())
+                                .map((update) => (
+                                  <div key={update.id}>
+                                    <p className="text-xs text-gray-400 mb-0.5">
+                                      <span className="font-medium text-gray-600">{update.posted_by}</span>
+                                      {' · '}{formatRelative(update.created_at)}
+                                    </p>
+                                    <p className="text-sm text-gray-700">{update.note}</p>
+                                  </div>
+                                ))
+                            ) : (
+                              <p className="text-xs text-gray-400">No updates yet</p>
+                            )}
+                          </div>
                         </div>
                       </div>
                     </div>
-                  </div>
-                )
-              })}
-
-              {completedProjects.length > 0 && (
-                <details className="group">
-                  <summary className="text-xs text-gray-400 cursor-pointer hover:text-gray-600 underline underline-offset-2 list-none pl-1 transition-colors duration-100">
-                    {completedProjects.length} completed project{completedProjects.length !== 1 ? 's' : ''}
-                  </summary>
-                  <div className="mt-2 space-y-2">
-                    {completedProjects.map((p) => (
-                      <div key={p.id} className="bg-white border border-gray-100 rounded-xl p-4 opacity-40 flex items-center justify-between">
-                        <span className="text-sm text-gray-700">{p.name}</span>
-                        <span className="text-xs text-gray-400 border border-gray-200 rounded-full px-2 py-0.5">Completed</span>
-                      </div>
-                    ))}
-                  </div>
-                </details>
-              )}
-            </div>
-          )}
-        </Section>
+                  )
+                })}
+                {completedProjects.length > 0 && (
+                  <details>
+                    <summary className="text-xs text-gray-400 cursor-pointer hover:text-gray-600 underline underline-offset-2 list-none pl-1 transition-colors duration-100">
+                      {completedProjects.length} completed project{completedProjects.length !== 1 ? 's' : ''}
+                    </summary>
+                    <div className="mt-2 space-y-2">
+                      {completedProjects.map((p) => (
+                        <div key={p.id} className="bg-white border border-gray-100 rounded-xl p-4 opacity-40 flex items-center justify-between">
+                          <span className="text-sm text-gray-700">{p.name}</span>
+                          <span className="text-xs text-gray-400 border border-gray-200 rounded-full px-2 py-0.5">Completed</span>
+                        </div>
+                      ))}
+                    </div>
+                  </details>
+                )}
+              </>
+            )}
+          </Section>
+        )}
 
       </div>
     </div>
