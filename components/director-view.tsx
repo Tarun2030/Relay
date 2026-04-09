@@ -13,34 +13,29 @@ import {
   formatDate, formatDateTime, formatTime, formatRelative,
   isPast, isWithinNextDays, cn,
 } from '@/lib/utils'
-import { ExternalLink, ChevronDown, ChevronUp, MapPin } from 'lucide-react'
+import { ExternalLink, ChevronDown, MapPin } from 'lucide-react'
 
-// ─── Color Palette ─────────────────────────────────────────────────────────────
-// Brand / Primary : Indigo   #6366F1
-// Flights         : Blue     #3B82F6   bg #EFF6FF
-// Hotels          : Violet   #8B5CF6   bg #F5F3FF
-// Events          : Orange   #F97316   bg #FFF7ED
-// Transfers       : Teal     #14B8A6   bg #F0FDFA
-// Dining          : Pink     #EC4899   bg #FDF2F8
-// Meetings        : Indigo   #6366F1   bg #EEF2FF
-// Projects        : Slate    #64748B   bg #F8FAFC
-// Status Green    : #16A34A  bg #DCFCE7  border #86EFAC
-// Status Amber    : #D97706  bg #FEF3C7  border #FCD34D
-// Status Red      : #DC2626  bg #FEE2E2  border #FCA5A5
+// ─── Design tokens ─────────────────────────────────────────────────────────────
+// Brand / Primary  Indigo  #6366F1
+// Flights          Blue    #3B82F6   bg #EFF6FF
+// Hotels           Violet  #8B5CF6   bg #F5F3FF
+// Events           Orange  #F97316   bg #FFF7ED
+// Transfers        Teal    #14B8A6   bg #F0FDFA
+// Dining           Pink    #EC4899   bg #FDF2F8
+// Meetings         Indigo  #6366F1   bg #EEF2FF
+// Status Green     #16A34A  Status Amber #D97706  Status Red #DC2626
 
-// ─── Category style map ────────────────────────────────────────────────────────
 const CAT = {
-  meetings:  { border: 'border-l-indigo-500', bg: 'bg-indigo-50/70',  iconColor: 'text-indigo-500'  },
-  flights:   { border: 'border-l-blue-500',   bg: 'bg-blue-50/70',    iconColor: 'text-blue-500'    },
-  hotels:    { border: 'border-l-violet-500', bg: 'bg-violet-50/70',  iconColor: 'text-violet-500'  },
-  events:    { border: 'border-l-orange-500', bg: 'bg-orange-50/70',  iconColor: 'text-orange-500'  },
-  transfers: { border: 'border-l-teal-500',   bg: 'bg-teal-50/70',    iconColor: 'text-teal-500'    },
-  dining:    { border: 'border-l-pink-500',   bg: 'bg-pink-50/70',    iconColor: 'text-pink-500'    },
-  projects:  { border: 'border-l-slate-400',  bg: 'bg-white',         iconColor: 'text-slate-500'   },
+  meetings:  { border: 'border-l-indigo-500', bg: 'bg-indigo-50/60',  icon: 'text-indigo-500',  divider: 'border-indigo-100',  ring: 'ring-indigo-200/60'  },
+  flights:   { border: 'border-l-blue-500',   bg: 'bg-blue-50/60',    icon: 'text-blue-500',    divider: 'border-blue-100',    ring: 'ring-blue-200/60'    },
+  hotels:    { border: 'border-l-violet-500', bg: 'bg-violet-50/60',  icon: 'text-violet-500',  divider: 'border-violet-100',  ring: 'ring-violet-200/60'  },
+  events:    { border: 'border-l-orange-500', bg: 'bg-orange-50/60',  icon: 'text-orange-500',  divider: 'border-orange-100',  ring: 'ring-orange-200/60'  },
+  transfers: { border: 'border-l-teal-500',   bg: 'bg-teal-50/60',    icon: 'text-teal-500',    divider: 'border-teal-100',    ring: 'ring-teal-200/60'    },
+  dining:    { border: 'border-l-pink-500',   bg: 'bg-pink-50/60',    icon: 'text-pink-500',    divider: 'border-pink-100',    ring: 'ring-pink-200/60'    },
+  projects:  { border: 'border-l-slate-400',  bg: 'bg-white',         icon: 'text-slate-500',   divider: 'border-slate-100',   ring: 'ring-slate-200/60'   },
 } as const
 type Category = keyof typeof CAT
 
-// ─── Status styles ─────────────────────────────────────────────────────────────
 const BOOKING_STATUS: Record<string, string> = {
   confirmed: 'bg-green-100 text-green-700 border border-green-300',
   pending:   'bg-amber-100 text-amber-700 border border-amber-300',
@@ -56,11 +51,11 @@ const PROJECT_LABEL: Record<string, string> = {
   on_track: 'On Track', needs_attention: 'Needs Attention', blocked: 'Blocked', completed: 'Completed',
 }
 
-// ─── Sub-components ────────────────────────────────────────────────────────────
+// ─── Status badge ──────────────────────────────────────────────────────────────
 function StatusBadge({ status }: { status: string }) {
   return (
     <span className={cn(
-      'inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-semibold shrink-0 tracking-wide',
+      'inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-semibold shrink-0',
       BOOKING_STATUS[status] ?? 'bg-gray-100 text-gray-500 border border-gray-200',
     )}>
       {status.charAt(0).toUpperCase() + status.slice(1)}
@@ -68,39 +63,98 @@ function StatusBadge({ status }: { status: string }) {
   )
 }
 
-function Card({
-  category, past = false, children,
+// ─── Expandable card ───────────────────────────────────────────────────────────
+// Uses CSS grid-rows 0fr→1fr trick for smooth height animation with no JS measurement
+function ExpandableCard({
+  id, category, expanded, onToggle, past = false, badge, primary, secondary,
 }: {
+  id: string
   category: Category
+  expanded: boolean
+  onToggle: (id: string) => void
   past?: boolean
-  children: React.ReactNode
+  badge: React.ReactNode
+  primary: React.ReactNode
+  secondary: React.ReactNode
 }) {
+  const { border, bg, divider, ring } = CAT[category]
+  return (
+    <div
+      onClick={() => onToggle(id)}
+      className={cn(
+        // Layout
+        'rounded-xl border border-gray-100/80 border-l-[3px] p-4 cursor-pointer select-none',
+        // Colors
+        border, bg,
+        // Depth — default shadow, hover: stronger shadow + 2px lift
+        'shadow-sm',
+        'hover:shadow-[0_4px_18px_rgba(0,0,0,0.09)] hover:-translate-y-[2px]',
+        // Expanded state: elevated + ring accent
+        expanded && ['shadow-[0_6px_24px_rgba(0,0,0,0.11)] -translate-y-[1px]', 'ring-1', ring],
+        // Transition — fast for hover, slightly slower for elevation changes
+        'transition-all duration-150 ease-out',
+        // Past items
+        past && 'opacity-35',
+      )}
+    >
+      {/* Primary row — always visible */}
+      <div className="flex items-start justify-between gap-3">
+        <div className="flex-1 min-w-0">{primary}</div>
+        <div className="flex items-center gap-2 shrink-0 mt-0.5">
+          {badge}
+          <ChevronDown className={cn(
+            'h-4 w-4 text-gray-400 transition-transform duration-200',
+            expanded && 'rotate-180 text-gray-600',
+          )} />
+        </div>
+      </div>
+
+      {/* Secondary row — smooth height + fade reveal */}
+      <div className={cn(
+        'grid transition-all duration-200 ease-in-out',
+        expanded ? 'grid-rows-[1fr]' : 'grid-rows-[0fr]',
+      )}>
+        <div className="overflow-hidden min-h-0">
+          <div className={cn(
+            'pt-3 mt-3 border-t',
+            divider,
+            'transition-opacity duration-150',
+            expanded ? 'opacity-100' : 'opacity-0',
+          )}>
+            {secondary}
+          </div>
+        </div>
+      </div>
+    </div>
+  )
+}
+
+// ─── Static hoverable card (meetings — no expandable extra data) ───────────────
+function HoverCard({ category, children }: { category: Category; children: React.ReactNode }) {
   const { border, bg } = CAT[category]
   return (
     <div className={cn(
-      'rounded-xl border border-gray-100/80 shadow-sm border-l-[3px] p-4',
+      'rounded-xl border border-gray-100/80 border-l-[3px] p-4',
       border, bg,
-      past && 'opacity-35',
+      'shadow-sm hover:shadow-[0_4px_18px_rgba(0,0,0,0.09)] hover:-translate-y-[2px]',
+      'transition-all duration-150 ease-out',
     )}>
       {children}
     </div>
   )
 }
 
+// ─── Section wrapper ───────────────────────────────────────────────────────────
 function Section({
   icon, title, section, directorId, category, children,
 }: {
-  icon: string
-  title: string
-  section: string
-  directorId: string
-  category: Category
-  children: React.ReactNode
+  icon: string; title: string; section: string
+  directorId: string; category: Category; children: React.ReactNode
 }) {
-  const { iconColor } = CAT[category]
+  const { icon: iconColor } = CAT[category]
   return (
     <section className="space-y-2.5">
-      <div className="flex items-center justify-between py-1 sticky top-0 bg-[#F7F8FA] z-10">
+      <div className="flex items-center justify-between py-1.5 sticky top-0 bg-[#F7F8FA]/95 backdrop-blur-sm z-10">
         <h2 className="text-sm font-semibold text-gray-800 flex items-center gap-2">
           <span className={cn('text-[15px]', iconColor)}>{icon}</span>
           {title}
@@ -124,15 +178,32 @@ function Empty() {
 function PastToggle({ count, noun, show, onToggle }: { count: number; noun: string; show: boolean; onToggle: () => void }) {
   return (
     <button
-      className="text-xs text-gray-400 hover:text-gray-600 underline underline-offset-2 pl-1"
-      onClick={onToggle}
+      className="text-xs text-gray-400 hover:text-gray-600 underline underline-offset-2 pl-1 transition-colors duration-100"
+      onClick={(e) => { e.stopPropagation(); onToggle() }}
     >
       {show ? 'Hide' : 'Show'} {count} past {noun}{count !== 1 ? 's' : ''}
     </button>
   )
 }
 
-// ─── Main component ────────────────────────────────────────────────────────────
+// ─── Metadata row (inside expanded panel) ─────────────────────────────────────
+function MetaRow({ children }: { children: React.ReactNode }) {
+  return (
+    <div className="flex flex-wrap gap-x-4 gap-y-1 text-xs text-gray-500">
+      {children}
+    </div>
+  )
+}
+function MetaItem({ label, value, mono = false }: { label: string; value?: string | null; mono?: boolean }) {
+  if (!value) return null
+  return (
+    <span>
+      {label} <span className={cn('font-medium text-gray-700', mono && 'font-mono')}>{value}</span>
+    </span>
+  )
+}
+
+// ─── Props ─────────────────────────────────────────────────────────────────────
 interface DirectorViewProps {
   director: Director
   eaName: string
@@ -142,6 +213,7 @@ interface DirectorViewProps {
   initialPushMessages: PushMessage[]
 }
 
+// ─── Main component ────────────────────────────────────────────────────────────
 export function DirectorView({
   director, eaName, initialBookings, initialCalendarEvents,
   initialProjects, initialPushMessages,
@@ -153,6 +225,7 @@ export function DirectorView({
   const [messages, setMessages]   = useState(initialPushMessages)
   const [showPastFlights, setShowPastFlights] = useState(false)
   const [showPastHotels,  setShowPastHotels]  = useState(false)
+  const [expandedCards, setExpandedCards]     = useState<Set<string>>(new Set())
   const [expandedProjects, setExpandedProjects] = useState<Set<string>>(new Set())
 
   useEffect(() => {
@@ -171,7 +244,22 @@ export function DirectorView({
     return () => { supabase.removeChannel(channel) }
   }, [director.id])
 
-  const sorted = (arr: Booking[]) => [...arr].sort((a, b) => a.date.localeCompare(b.date))
+  function toggleCard(id: string) {
+    setExpandedCards((prev) => {
+      const next = new Set(prev)
+      next.has(id) ? next.delete(id) : next.add(id)
+      return next
+    })
+  }
+  function toggleProject(id: string) {
+    setExpandedProjects((prev) => {
+      const next = new Set(prev)
+      next.has(id) ? next.delete(id) : next.add(id)
+      return next
+    })
+  }
+
+  const sorted   = (arr: Booking[]) => [...arr].sort((a, b) => a.date.localeCompare(b.date))
   const flights     = sorted(bookings.filter((b) => b.type === 'flight'))
   const hotels      = sorted(bookings.filter((b) => b.type === 'hotel'))
   const eventBkgs   = sorted(bookings.filter((b) => b.type === 'event'))
@@ -194,14 +282,6 @@ export function DirectorView({
     ...projects.map((p) => p.updated_at),
   ].filter(Boolean).map((d) => new Date(d).getTime()).sort((a, b) => b - a)[0]
 
-  function toggleProject(id: string) {
-    setExpandedProjects((prev) => {
-      const next = new Set(prev)
-      next.has(id) ? next.delete(id) : next.add(id)
-      return next
-    })
-  }
-
   return (
     <div className="min-h-screen bg-[#F7F8FA]">
       <PushMessageBanner messages={messages} />
@@ -209,14 +289,14 @@ export function DirectorView({
       <div className="max-w-2xl mx-auto px-5 py-8 space-y-8">
 
         {/* ── Header ── */}
-        <div className="pb-4 border-b border-gray-200/70">
+        <div className="pb-4 border-b border-gray-200/60">
           <div className="flex items-center gap-2.5 mb-1">
             <span className="w-2 h-2 rounded-full bg-indigo-500 shrink-0" />
             <h1 className="text-xl font-bold text-gray-900 tracking-tight">
               {director.full_name}&apos;s Schedule
             </h1>
           </div>
-          <p className="text-xs text-gray-400 pl-4.5 ml-[18px]">
+          <p className="text-xs text-gray-400 ml-[18px]">
             Managed by <span className="text-gray-500 font-medium">{eaName}</span>
             {lastUpdated ? ` · Updated ${formatRelative(new Date(lastUpdated).toISOString())}` : ''}
           </p>
@@ -227,14 +307,14 @@ export function DirectorView({
           {weekMeetings.length === 0 ? <Empty /> : (
             <div className="space-y-2.5">
               {weekMeetings.map((event) => (
-                <Card key={event.id} category="meetings">
+                <HoverCard key={event.id} category="meetings">
                   <div className="flex items-start justify-between gap-3">
                     <div className="flex-1 min-w-0">
-                      <p className="text-sm font-semibold text-gray-900">{event.title}</p>
+                      <p className="text-sm font-bold text-gray-900">{event.title}</p>
                       <div className="flex flex-wrap gap-x-3 text-xs text-gray-500 mt-1">
                         <span>{formatDate(event.start_time)}</span>
                         {!event.start_time.endsWith('T00:00:00') && (
-                          <span className="font-medium text-indigo-600">
+                          <span className="font-semibold text-indigo-600">
                             {formatTime(event.start_time)} – {formatTime(event.end_time)}
                           </span>
                         )}
@@ -246,14 +326,18 @@ export function DirectorView({
                       </div>
                     </div>
                     {event.meeting_link && (
-                      <Button asChild size="sm" className="h-7 text-xs shrink-0 bg-indigo-600 hover:bg-indigo-700 text-white border-0 gap-1">
+                      <Button
+                        asChild size="sm"
+                        className="h-7 text-xs shrink-0 bg-indigo-600 hover:bg-indigo-700 text-white border-0 gap-1 transition-colors duration-150"
+                        onClick={(e) => e.stopPropagation()}
+                      >
                         <a href={event.meeting_link} target="_blank" rel="noopener noreferrer">
                           Join <ExternalLink className="h-3 w-3" />
                         </a>
                       </Button>
                     )}
                   </div>
-                </Card>
+                </HoverCard>
               ))}
             </div>
           )}
@@ -266,28 +350,34 @@ export function DirectorView({
               {futureFlights.map((b) => {
                 const f = b.details as FlightDetails
                 return (
-                  <Card key={b.id} category="flights">
-                    <div className="flex items-start justify-between gap-3">
-                      <div className="flex-1 min-w-0">
-                        <p className="text-sm font-bold text-gray-900 tracking-tight">
-                          {f.origin} → {f.destination}
-                        </p>
-                        <div className="flex flex-wrap gap-x-3 text-xs text-gray-500 mt-1">
-                          <span className="font-medium text-blue-600">
+                  <ExpandableCard
+                    key={b.id} id={b.id} category="flights"
+                    expanded={expandedCards.has(b.id)} onToggle={toggleCard}
+                    badge={<StatusBadge status={b.status} />}
+                    primary={
+                      <>
+                        <p className="text-sm font-bold text-gray-900 tracking-tight">{f.origin} → {f.destination}</p>
+                        <div className="flex flex-wrap items-center gap-x-3 mt-1">
+                          <span className="text-xs font-semibold text-blue-600">
                             {formatTime(f.departure_time)} → {formatTime(f.arrival_time)}
                           </span>
-                          <span>{formatDate(b.date)}</span>
-                          <span>{f.airline} {f.flight_number}</span>
+                          <span className="text-xs text-gray-400">{formatDate(b.date)}</span>
+                          <span className="text-xs text-gray-400">{f.airline}</span>
                         </div>
-                        <div className="flex flex-wrap gap-x-3 text-xs text-gray-400 mt-0.5">
-                          <span>PNR <span className="font-mono text-gray-500">{f.pnr}</span></span>
-                          {f.seat && <span>Seat {f.seat}</span>}
-                          {f.class && <span>{f.class}</span>}
-                        </div>
-                      </div>
-                      <StatusBadge status={b.status} />
-                    </div>
-                  </Card>
+                      </>
+                    }
+                    secondary={
+                      <MetaRow>
+                        <MetaItem label="PNR" value={f.pnr} mono />
+                        <MetaItem label="Flight" value={f.flight_number} />
+                        <MetaItem label="Seat" value={f.seat} />
+                        <MetaItem label="Class" value={f.class} />
+                        <MetaItem label="Terminal" value={f.terminal} />
+                        <MetaItem label="Gate" value={f.gate} />
+                        <MetaItem label="Passenger" value={f.passenger_name} />
+                      </MetaRow>
+                    }
+                  />
                 )
               })}
               {pastFlights.length > 0 && (
@@ -296,10 +386,18 @@ export function DirectorView({
               {showPastFlights && pastFlights.map((b) => {
                 const f = b.details as FlightDetails
                 return (
-                  <Card key={b.id} category="flights" past>
-                    <p className="text-sm font-semibold text-gray-700">{f.origin} → {f.destination}</p>
-                    <p className="text-xs text-gray-400 mt-0.5">{formatDate(b.date)} · {f.airline} {f.flight_number} · PNR {f.pnr}</p>
-                  </Card>
+                  <ExpandableCard
+                    key={b.id} id={b.id} category="flights" past
+                    expanded={expandedCards.has(b.id)} onToggle={toggleCard}
+                    badge={<StatusBadge status={b.status} />}
+                    primary={
+                      <>
+                        <p className="text-sm font-bold text-gray-700">{f.origin} → {f.destination}</p>
+                        <p className="text-xs text-gray-400 mt-0.5">{formatDate(b.date)} · {f.airline} {f.flight_number}</p>
+                      </>
+                    }
+                    secondary={<MetaItem label="PNR" value={f.pnr} mono />}
+                  />
                 )
               })}
             </div>
@@ -313,24 +411,30 @@ export function DirectorView({
               {futureHotels.map((b) => {
                 const h = b.details as HotelDetails
                 return (
-                  <Card key={b.id} category="hotels">
-                    <div className="flex items-start justify-between gap-3">
-                      <div className="flex-1 min-w-0">
+                  <ExpandableCard
+                    key={b.id} id={b.id} category="hotels"
+                    expanded={expandedCards.has(b.id)} onToggle={toggleCard}
+                    badge={<StatusBadge status={b.status} />}
+                    primary={
+                      <>
                         <p className="text-sm font-bold text-gray-900">{h.property_name}</p>
-                        <div className="flex flex-wrap gap-x-3 text-xs text-gray-500 mt-1">
-                          <span className="font-medium text-violet-600">
+                        <div className="flex flex-wrap items-center gap-x-3 mt-1">
+                          <span className="text-xs font-semibold text-violet-600">
                             {formatDate(h.check_in)} → {formatDate(h.check_out)}
                           </span>
-                          <span>{h.city}</span>
+                          <span className="text-xs text-gray-400">{h.city}</span>
                         </div>
-                        <div className="text-xs text-gray-400 mt-0.5">
-                          Conf <span className="font-mono text-gray-500">{h.confirmation_number}</span>
-                          {h.room_type && <span> · {h.room_type}</span>}
-                        </div>
-                      </div>
-                      <StatusBadge status={b.status} />
-                    </div>
-                  </Card>
+                      </>
+                    }
+                    secondary={
+                      <MetaRow>
+                        <MetaItem label="Conf" value={h.confirmation_number} mono />
+                        <MetaItem label="Room" value={h.room_type} />
+                        <MetaItem label="Address" value={h.address} />
+                        <MetaItem label="Contact" value={h.contact_number} />
+                      </MetaRow>
+                    }
+                  />
                 )
               })}
               {pastHotels.length > 0 && (
@@ -339,10 +443,18 @@ export function DirectorView({
               {showPastHotels && pastHotels.map((b) => {
                 const h = b.details as HotelDetails
                 return (
-                  <Card key={b.id} category="hotels" past>
-                    <p className="text-sm font-semibold text-gray-700">{h.property_name}, {h.city}</p>
-                    <p className="text-xs text-gray-400 mt-0.5">{formatDate(h.check_in)} → {formatDate(h.check_out)}</p>
-                  </Card>
+                  <ExpandableCard
+                    key={b.id} id={b.id} category="hotels" past
+                    expanded={expandedCards.has(b.id)} onToggle={toggleCard}
+                    badge={<StatusBadge status={b.status} />}
+                    primary={
+                      <>
+                        <p className="text-sm font-bold text-gray-700">{h.property_name}, {h.city}</p>
+                        <p className="text-xs text-gray-400 mt-0.5">{formatDate(h.check_in)} → {formatDate(h.check_out)}</p>
+                      </>
+                    }
+                    secondary={<MetaItem label="Conf" value={h.confirmation_number} mono />}
+                  />
                 )
               })}
             </div>
@@ -356,19 +468,28 @@ export function DirectorView({
               {eventBkgs.map((b) => {
                 const e = b.details as EventDetails
                 return (
-                  <Card key={b.id} category="events" past={isPast(b.date)}>
-                    <div className="flex items-start justify-between gap-3">
-                      <div className="flex-1 min-w-0">
+                  <ExpandableCard
+                    key={b.id} id={b.id} category="events" past={isPast(b.date)}
+                    expanded={expandedCards.has(b.id)} onToggle={toggleCard}
+                    badge={<StatusBadge status={b.status} />}
+                    primary={
+                      <>
                         <p className="text-sm font-bold text-gray-900">{e.event_name}</p>
-                        <div className="flex flex-wrap gap-x-3 text-xs text-gray-500 mt-1">
-                          <span className="font-medium text-orange-600">{formatDateTime(e.start_time)}</span>
-                          <span>{e.venue}, {e.city}</span>
-                          {e.dress_code && <span>Dress: {e.dress_code}</span>}
+                        <div className="flex flex-wrap items-center gap-x-3 mt-1">
+                          <span className="text-xs font-semibold text-orange-600">{formatDateTime(e.start_time)}</span>
+                          <span className="text-xs text-gray-400">{e.city}</span>
                         </div>
-                      </div>
-                      <StatusBadge status={b.status} />
-                    </div>
-                  </Card>
+                      </>
+                    }
+                    secondary={
+                      <MetaRow>
+                        <MetaItem label="Venue" value={e.venue} />
+                        <MetaItem label="Ticket" value={e.ticket_number} mono />
+                        <MetaItem label="Seat" value={e.seat} />
+                        <MetaItem label="Dress" value={e.dress_code} />
+                      </MetaRow>
+                    }
+                  />
                 )
               })}
             </div>
@@ -382,24 +503,27 @@ export function DirectorView({
               {cabs.map((b) => {
                 const c = b.details as CabDetails
                 return (
-                  <Card key={b.id} category="transfers" past={isPast(b.date)}>
-                    <div className="flex items-start justify-between gap-3">
-                      <div className="flex-1 min-w-0">
+                  <ExpandableCard
+                    key={b.id} id={b.id} category="transfers" past={isPast(b.date)}
+                    expanded={expandedCards.has(b.id)} onToggle={toggleCard}
+                    badge={<StatusBadge status={b.status} />}
+                    primary={
+                      <>
                         <p className="text-sm font-bold text-gray-900">{c.pickup_location} → {c.drop_location}</p>
-                        <div className="flex flex-wrap gap-x-3 text-xs text-gray-500 mt-1">
-                          <span className="font-medium text-teal-600">{formatDateTime(c.pickup_time)}</span>
-                          <span>{c.provider}</span>
-                          {c.driver_name && <span>Driver: {c.driver_name}</span>}
+                        <div className="flex flex-wrap items-center gap-x-3 mt-1">
+                          <span className="text-xs font-semibold text-teal-600">{formatDateTime(c.pickup_time)}</span>
+                          <span className="text-xs text-gray-400">{c.provider}</span>
                         </div>
-                        {c.booking_id && (
-                          <p className="text-xs text-gray-400 mt-0.5">
-                            ID <span className="font-mono text-gray-500">{c.booking_id}</span>
-                          </p>
-                        )}
-                      </div>
-                      <StatusBadge status={b.status} />
-                    </div>
-                  </Card>
+                      </>
+                    }
+                    secondary={
+                      <MetaRow>
+                        <MetaItem label="Booking ID" value={c.booking_id} mono />
+                        <MetaItem label="Driver" value={c.driver_name} />
+                        <MetaItem label="Contact" value={c.driver_contact} />
+                      </MetaRow>
+                    }
+                  />
                 )
               })}
             </div>
@@ -413,24 +537,26 @@ export function DirectorView({
               {restaurants.map((b) => {
                 const r = b.details as RestaurantDetails
                 return (
-                  <Card key={b.id} category="dining" past={isPast(b.date)}>
-                    <div className="flex items-start justify-between gap-3">
-                      <div className="flex-1 min-w-0">
+                  <ExpandableCard
+                    key={b.id} id={b.id} category="dining" past={isPast(b.date)}
+                    expanded={expandedCards.has(b.id)} onToggle={toggleCard}
+                    badge={<StatusBadge status={b.status} />}
+                    primary={
+                      <>
                         <p className="text-sm font-bold text-gray-900">{r.restaurant_name}</p>
-                        <div className="flex flex-wrap gap-x-3 text-xs text-gray-500 mt-1">
-                          <span className="font-medium text-pink-600">{formatDateTime(r.reservation_time)}</span>
-                          <span>{r.location}</span>
-                          <span>{r.party_size} guests</span>
+                        <div className="flex flex-wrap items-center gap-x-3 mt-1">
+                          <span className="text-xs font-semibold text-pink-600">{formatDateTime(r.reservation_time)}</span>
+                          <span className="text-xs text-gray-400">{r.location}</span>
+                          <span className="text-xs text-gray-400">{r.party_size} guests</span>
                         </div>
-                        {r.confirmation_number && (
-                          <p className="text-xs text-gray-400 mt-0.5">
-                            Conf <span className="font-mono text-gray-500">{r.confirmation_number}</span>
-                          </p>
-                        )}
-                      </div>
-                      <StatusBadge status={b.status} />
-                    </div>
-                  </Card>
+                      </>
+                    }
+                    secondary={
+                      <MetaRow>
+                        <MetaItem label="Conf" value={r.confirmation_number} mono />
+                      </MetaRow>
+                    }
+                  />
                 )
               })}
             </div>
@@ -445,9 +571,17 @@ export function DirectorView({
                 const expanded = expandedProjects.has(project.id)
                 const latestUpdate = project.updates?.[0]
                 return (
-                  <div key={project.id} className="bg-white border border-gray-100/80 rounded-xl shadow-sm border-l-[3px] border-l-slate-400 overflow-hidden">
+                  <div
+                    key={project.id}
+                    className={cn(
+                      'bg-white rounded-xl border border-gray-100/80 border-l-[3px] border-l-slate-400 overflow-hidden',
+                      'shadow-sm hover:shadow-[0_4px_18px_rgba(0,0,0,0.09)] hover:-translate-y-[2px]',
+                      expanded && 'shadow-[0_6px_24px_rgba(0,0,0,0.10)] -translate-y-[1px] ring-1 ring-slate-200/60',
+                      'transition-all duration-150 ease-out',
+                    )}
+                  >
                     <button
-                      className="w-full flex items-start justify-between gap-3 p-4 text-left hover:bg-slate-50/70 transition-colors"
+                      className="w-full flex items-start justify-between gap-3 p-4 text-left hover:bg-slate-50/60 transition-colors duration-100"
                       onClick={() => toggleProject(project.id)}
                     >
                       <div className="flex-1 min-w-0">
@@ -464,34 +598,48 @@ export function DirectorView({
                           <p className="text-xs text-gray-400 mt-1 truncate">{latestUpdate.note}</p>
                         )}
                       </div>
-                      {expanded
-                        ? <ChevronUp className="h-4 w-4 text-gray-400 shrink-0 mt-0.5" />
-                        : <ChevronDown className="h-4 w-4 text-gray-400 shrink-0 mt-0.5" />}
+                      <ChevronDown className={cn(
+                        'h-4 w-4 text-gray-400 shrink-0 mt-0.5 transition-transform duration-200',
+                        expanded && 'rotate-180 text-gray-600',
+                      )} />
                     </button>
-                    {expanded && (
-                      <div className="border-t border-gray-100 bg-slate-50/60 p-4 space-y-3">
-                        {project.updates && project.updates.length > 0 ? (
-                          project.updates
-                            .sort((a, b) => new Date(b.created_at).getTime() - new Date(a.created_at).getTime())
-                            .map((update) => (
-                              <div key={update.id}>
-                                <p className="text-xs text-gray-400 mb-0.5">
-                                  <span className="font-medium text-gray-600">{update.posted_by}</span> · {formatRelative(update.created_at)}
-                                </p>
-                                <p className="text-sm text-gray-700">{update.note}</p>
-                              </div>
-                            ))
-                        ) : (
-                          <p className="text-xs text-gray-400">No updates yet</p>
-                        )}
+
+                    {/* Smooth expand for project updates */}
+                    <div className={cn(
+                      'grid transition-all duration-200 ease-in-out',
+                      expanded ? 'grid-rows-[1fr]' : 'grid-rows-[0fr]',
+                    )}>
+                      <div className="overflow-hidden min-h-0">
+                        <div className={cn(
+                          'border-t border-slate-100 bg-slate-50/60 p-4 space-y-3',
+                          'transition-opacity duration-150',
+                          expanded ? 'opacity-100' : 'opacity-0',
+                        )}>
+                          {project.updates && project.updates.length > 0 ? (
+                            project.updates
+                              .sort((a, b) => new Date(b.created_at).getTime() - new Date(a.created_at).getTime())
+                              .map((update) => (
+                                <div key={update.id}>
+                                  <p className="text-xs text-gray-400 mb-0.5">
+                                    <span className="font-medium text-gray-600">{update.posted_by}</span>
+                                    {' · '}{formatRelative(update.created_at)}
+                                  </p>
+                                  <p className="text-sm text-gray-700">{update.note}</p>
+                                </div>
+                              ))
+                          ) : (
+                            <p className="text-xs text-gray-400">No updates yet</p>
+                          )}
+                        </div>
                       </div>
-                    )}
+                    </div>
                   </div>
                 )
               })}
+
               {completedProjects.length > 0 && (
                 <details className="group">
-                  <summary className="text-xs text-gray-400 cursor-pointer hover:text-gray-600 underline underline-offset-2 list-none pl-1">
+                  <summary className="text-xs text-gray-400 cursor-pointer hover:text-gray-600 underline underline-offset-2 list-none pl-1 transition-colors duration-100">
                     {completedProjects.length} completed project{completedProjects.length !== 1 ? 's' : ''}
                   </summary>
                   <div className="mt-2 space-y-2">
