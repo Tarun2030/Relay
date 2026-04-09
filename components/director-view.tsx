@@ -147,7 +147,9 @@ export function DirectorView({
                   <div className="font-medium text-sm text-green-900">{event.title}</div>
                   <div className="text-xs text-green-700 mt-0.5 flex flex-wrap gap-x-3 gap-y-1">
                     <span>{formatDate(event.start_time)}</span>
-                    <span>{formatTime(event.start_time)} – {formatTime(event.end_time)}</span>
+                    {!event.start_time.endsWith('T00:00:00') && (
+                      <span>{formatTime(event.start_time)} – {formatTime(event.end_time)}</span>
+                    )}
                     {event.location && (
                       <span className="flex items-center gap-1">
                         <MapPin className="h-3 w-3" /> {event.location}
