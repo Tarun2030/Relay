@@ -20,7 +20,9 @@ Each object:
 Field schemas:
 Flight: flight_number, airline, origin, destination,
   departure_time (ISO 8601), arrival_time (ISO 8601),
-  pnr, seat, class, terminal, gate, passenger_name
+  pnr, seat, class, departure_terminal, arrival_terminal, gate, passenger_name
+  (departure_terminal = terminal at origin airport; arrival_terminal = terminal at destination airport;
+   use null if not mentioned — never omit the fields)
 Hotel: property_name, city, address, check_in (YYYY-MM-DD),
   check_out (YYYY-MM-DD), confirmation_number, room_type, contact_number
 Event: event_name, venue, city, start_time (ISO 8601),

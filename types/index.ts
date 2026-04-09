@@ -43,7 +43,8 @@ export interface FlightDetails {
   pnr: string
   seat?: string
   class?: string
-  terminal?: string
+  departure_terminal?: string
+  arrival_terminal?: string
   gate?: string
   passenger_name: string
 }

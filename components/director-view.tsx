@@ -372,7 +372,8 @@ export function DirectorView({
                         <MetaItem label="Flight" value={f.flight_number} />
                         <MetaItem label="Seat" value={f.seat} />
                         <MetaItem label="Class" value={f.class} />
-                        <MetaItem label="Terminal" value={f.terminal} />
+                        <MetaItem label="Dep. Terminal" value={f.departure_terminal ?? 'NA'} />
+                        <MetaItem label="Arr. Terminal" value={f.arrival_terminal ?? 'NA'} />
                         <MetaItem label="Gate" value={f.gate} />
                         <MetaItem label="Passenger" value={f.passenger_name} />
                       </MetaRow>
@@ -396,7 +397,13 @@ export function DirectorView({
                         <p className="text-xs text-gray-400 mt-0.5">{formatDate(b.date)} · {f.airline} {f.flight_number}</p>
                       </>
                     }
-                    secondary={<MetaItem label="PNR" value={f.pnr} mono />}
+                    secondary={
+                      <MetaRow>
+                        <MetaItem label="PNR" value={f.pnr} mono />
+                        <MetaItem label="Dep. Terminal" value={f.departure_terminal ?? 'NA'} />
+                        <MetaItem label="Arr. Terminal" value={f.arrival_terminal ?? 'NA'} />
+                      </MetaRow>
+                    }
                   />
                 )
               })}
