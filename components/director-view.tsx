@@ -4,6 +4,7 @@ import { useEffect, useState } from 'react'
 import { createClient } from '@/lib/supabase/client'
 import { PushMessageBanner } from '@/components/push-message-banner'
 import { ColorCodedSection } from '@/components/color-coded-section'
+import { VoiceNoteButton } from '@/components/voice-note-button'
 import { Badge } from '@/components/ui/badge'
 import { Button } from '@/components/ui/button'
 import type {
@@ -73,9 +74,6 @@ export function DirectorView({
           if (payload.eventType === 'INSERT') setMessages((p) => [payload.new as PushMessage, ...p])
           else if (payload.eventType === 'UPDATE') setMessages((p) => p.map((m) => m.id === payload.new.id ? payload.new as PushMessage : m))
         })
-      .on('postgres_changes', { event: '*', schema: 'public', table: 'project_updates' }, () => {
-        // Reload projects when updates change
-      })
       .subscribe()
 
     return () => { supabase.removeChannel(channel) }
@@ -125,8 +123,21 @@ export function DirectorView({
           </p>
         </div>
 
-        {/* Meetings */}
-        <ColorCodedSection icon="📅" title="This Week" headerClass="text-green-700" sticky>
+        {/* Meetings this week */}
+        <ColorCodedSection
+          icon="📅"
+          title="This Week"
+          headerClass="text-green-700"
+          sticky
+          action={
+            <VoiceNoteButton
+              directorId={director.id}
+              section="meetings"
+              sectionLabel="Meetings"
+              colorClass="text-green-700 hover:bg-green-100"
+            />
+          }
+        >
           <div className="space-y-2">
             {weekMeetings.length === 0 ? (
               <p className="text-sm text-muted-foreground">No meetings this week</p>
@@ -157,7 +168,20 @@ export function DirectorView({
         </ColorCodedSection>
 
         {/* Flights */}
-        <ColorCodedSection icon="✈️" title="Flights" headerClass="text-orange-700" sticky>
+        <ColorCodedSection
+          icon="✈️"
+          title="Flights"
+          headerClass="text-orange-700"
+          sticky
+          action={
+            <VoiceNoteButton
+              directorId={director.id}
+              section="flights"
+              sectionLabel="Flights"
+              colorClass="text-orange-700 hover:bg-orange-100"
+            />
+          }
+        >
           <div className="space-y-2">
             {futureFlights.length === 0 && pastFlights.length === 0 ? (
               <p className="text-sm text-muted-foreground">Nothing scheduled</p>
@@ -207,7 +231,20 @@ export function DirectorView({
         </ColorCodedSection>
 
         {/* Hotels */}
-        <ColorCodedSection icon="🏨" title="Hotels" headerClass="text-blue-700" sticky>
+        <ColorCodedSection
+          icon="🏨"
+          title="Hotels"
+          headerClass="text-blue-700"
+          sticky
+          action={
+            <VoiceNoteButton
+              directorId={director.id}
+              section="hotels"
+              sectionLabel="Hotels"
+              colorClass="text-blue-700 hover:bg-blue-100"
+            />
+          }
+        >
           <div className="space-y-2">
             {futureHotels.length === 0 && pastHotels.length === 0 ? (
               <p className="text-sm text-muted-foreground">Nothing scheduled</p>
@@ -255,7 +292,20 @@ export function DirectorView({
         </ColorCodedSection>
 
         {/* Events */}
-        <ColorCodedSection icon="🎭" title="Events" headerClass="text-purple-700" sticky>
+        <ColorCodedSection
+          icon="🎭"
+          title="Events"
+          headerClass="text-purple-700"
+          sticky
+          action={
+            <VoiceNoteButton
+              directorId={director.id}
+              section="events"
+              sectionLabel="Events"
+              colorClass="text-purple-700 hover:bg-purple-100"
+            />
+          }
+        >
           <div className="space-y-2">
             {eventBookings.length === 0 ? (
               <p className="text-sm text-muted-foreground">Nothing scheduled</p>
@@ -275,8 +325,21 @@ export function DirectorView({
           </div>
         </ColorCodedSection>
 
-        {/* Cabs */}
-        <ColorCodedSection icon="🚗" title="Transfers" headerClass="text-yellow-700" sticky>
+        {/* Transfers */}
+        <ColorCodedSection
+          icon="🚗"
+          title="Transfers"
+          headerClass="text-yellow-700"
+          sticky
+          action={
+            <VoiceNoteButton
+              directorId={director.id}
+              section="transfers"
+              sectionLabel="Transfers"
+              colorClass="text-yellow-700 hover:bg-yellow-100"
+            />
+          }
+        >
           <div className="space-y-2">
             {cabs.length === 0 ? (
               <p className="text-sm text-muted-foreground">Nothing scheduled</p>
@@ -297,8 +360,21 @@ export function DirectorView({
           </div>
         </ColorCodedSection>
 
-        {/* Restaurants */}
-        <ColorCodedSection icon="🍽️" title="Dining" headerClass="text-pink-700" sticky>
+        {/* Dining */}
+        <ColorCodedSection
+          icon="🍽️"
+          title="Dining"
+          headerClass="text-pink-700"
+          sticky
+          action={
+            <VoiceNoteButton
+              directorId={director.id}
+              section="dining"
+              sectionLabel="Dining"
+              colorClass="text-pink-700 hover:bg-pink-100"
+            />
+          }
+        >
           <div className="space-y-2">
             {restaurants.length === 0 ? (
               <p className="text-sm text-muted-foreground">Nothing scheduled</p>
@@ -320,7 +396,20 @@ export function DirectorView({
         </ColorCodedSection>
 
         {/* Projects */}
-        <ColorCodedSection icon="📁" title="Active Projects" headerClass="text-gray-700" sticky>
+        <ColorCodedSection
+          icon="📁"
+          title="Active Projects"
+          headerClass="text-gray-700"
+          sticky
+          action={
+            <VoiceNoteButton
+              directorId={director.id}
+              section="projects"
+              sectionLabel="Projects"
+              colorClass="text-gray-700 hover:bg-gray-100"
+            />
+          }
+        >
           <div className="space-y-2">
             {activeProjects.length === 0 ? (
               <p className="text-sm text-muted-foreground">Nothing scheduled</p>

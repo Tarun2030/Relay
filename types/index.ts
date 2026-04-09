@@ -131,3 +131,14 @@ export interface PushMessage {
   is_read: boolean
   created_at: string
 }
+
+export type DirectorNoteSection = 'flights' | 'hotels' | 'events' | 'transfers' | 'dining' | 'meetings' | 'projects' | 'general'
+
+export interface DirectorNote {
+  id: string
+  director_id: string
+  section: DirectorNoteSection
+  note: string
+  is_read: boolean
+  created_at: string
+}
