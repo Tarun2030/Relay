@@ -74,6 +74,12 @@ export function formatDateTimeInZone(dateStr: string, timeZone?: string) {
   return formatInTimeZone(toInstant(dateStr, timeZone), timeZone, 'MMM d, yyyy h:mm a')
 }
 
+/** "Sep 6, 2026" as read off a calendar at `timeZone`. Falls back to viewer-local. */
+export function formatDateInZone(dateStr: string, timeZone?: string) {
+  if (!timeZone) return formatDate(dateStr)
+  return formatInTimeZone(toInstant(dateStr, timeZone), timeZone, 'MMM d, yyyy')
+}
+
 /**
  * Short, human hint for which timezone a time is being shown in — the city
  * segment of the IANA name, e.g. "Asia/Dubai" → "Dubai", "America/New_York" →

@@ -71,6 +71,10 @@ export async function GET(request: Request) {
         description: event.description || null,
         meeting_link: extractMeetingLink(event.description, event.hangoutLink) || null,
         attendees: (event.attendees || []).map((a) => a.email || '').filter(Boolean),
+        // IANA zone the event was created in — the location's clock, not the
+        // syncing device's. Falls back to the end timeZone (all-day events
+        // often only set one side).
+        timezone: event.start?.timeZone || event.end?.timeZone || null,
         synced_at: new Date().toISOString(),
       }
     })

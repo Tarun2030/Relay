@@ -10,10 +10,8 @@ import type {
   FlightDetails, HotelDetails, EventDetails, CabDetails, RestaurantDetails,
 } from '@/types'
 import {
-  // formatTime here stays viewer-local on purpose: it only renders synced
-  // Google Calendar meetings, where the viewer's own clock is the right frame.
-  formatDate, formatTime, formatRelative,
-  formatTimeInZone, formatDateTimeInZone, shortTimeZoneLabel,
+  formatDate, formatRelative,
+  formatTimeInZone, formatDateInZone, formatDateTimeInZone, shortTimeZoneLabel,
   isPast, isWithinNextDays, cn,
 } from '@/lib/utils'
 import { ExternalLink, ChevronDown, MapPin } from 'lucide-react'
@@ -356,10 +354,11 @@ export function DirectorView({
                   <div className="flex-1 min-w-0">
                     <p className="text-sm font-bold text-gray-900">{event.title}</p>
                     <div className="flex flex-wrap gap-x-3 text-xs text-gray-500 mt-1">
-                      <span>{formatDate(event.start_time)}</span>
+                      <span>{formatDateInZone(event.start_time, event.timezone)}</span>
                       {!event.start_time.endsWith('T00:00:00') && (
                         <span className="font-semibold text-indigo-600">
-                          {formatTime(event.start_time)} – {formatTime(event.end_time)}
+                          {formatTimeInZone(event.start_time, event.timezone)} – {formatTimeInZone(event.end_time, event.timezone)}
+                          <ZoneHint tz={event.timezone} />
                         </span>
                       )}
                       {event.location && (

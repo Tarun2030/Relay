@@ -128,6 +128,8 @@ export interface CalendarEvent {
   meeting_link?: string
   attendees: string[]
   synced_at: string
+  /** IANA timezone the event was created in (from Google Calendar). Absent for events synced before this field existed. */
+  timezone?: string
 }
 
 export interface Project {

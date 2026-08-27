@@ -48,6 +48,7 @@ create table calendar_events (
   description text,
   meeting_link text,
   attendees jsonb default '[]',
+  timezone text,
   synced_at timestamptz default now(),
   unique (director_id, google_event_id)
 );

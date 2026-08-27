@@ -1,7 +1,14 @@
 import { ExternalLink, MapPin } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import type { CalendarEvent } from '@/types'
-import { formatDate, formatTime } from '@/lib/utils'
+import { formatDateInZone, formatTimeInZone, shortTimeZoneLabel } from '@/lib/utils'
+
+// Subtle parenthetical naming the city whose clock a time is shown on.
+function ZoneHint({ tz }: { tz?: string }) {
+  const label = shortTimeZoneLabel(tz)
+  if (!label) return null
+  return <span className="opacity-70"> ({label})</span>
+}
 
 interface CalendarEventRowProps {
   event: CalendarEvent
@@ -13,9 +20,12 @@ export function CalendarEventRow({ event }: CalendarEventRowProps) {
       <div className="flex-1 min-w-0">
         <div className="font-medium text-sm text-green-900">{event.title}</div>
         <div className="text-xs text-green-700 mt-0.5 flex flex-wrap gap-x-3 gap-y-1">
-          <span>{formatDate(event.start_time)}</span>
+          <span>{formatDateInZone(event.start_time, event.timezone)}</span>
           {!event.start_time.endsWith('T00:00:00') && (
-            <span>{formatTime(event.start_time)} – {formatTime(event.end_time)}</span>
+            <span>
+              {formatTimeInZone(event.start_time, event.timezone)} – {formatTimeInZone(event.end_time, event.timezone)}
+              <ZoneHint tz={event.timezone} />
+            </span>
           )}
           {event.location && (
             <span className="flex items-center gap-1">
