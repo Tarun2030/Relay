@@ -20,15 +20,17 @@ export async function GET(request: Request) {
   const directorId = url.searchParams.get('director_id')
   if (!directorId) return NextResponse.json({ error: 'director_id required' }, { status: 400 })
 
-  // Get calendar token
-  const { data: tokenRow } = await supabase
-    .from('calendar_tokens')
-    .select('*')
-    .eq('ea_id', user.id)
-    .single()
+  // Get calendar token and the director's own calendar to sync
+  const [{ data: tokenRow }, { data: director }] = await Promise.all([
+    supabase.from('calendar_tokens').select('*').eq('ea_id', user.id).single(),
+    supabase.from('directors').select('calendar_id').eq('id', directorId).eq('ea_id', user.id).single(),
+  ])
 
   if (!tokenRow) {
     return NextResponse.json({ error: 'Calendar not connected. Go to Settings to connect Google Calendar.' }, { status: 400 })
+  }
+  if (!director) {
+    return NextResponse.json({ error: 'Director not found' }, { status: 404 })
   }
 
   let { access_token, refresh_token, expiry } = tokenRow
@@ -52,7 +54,7 @@ export async function GET(request: Request) {
   }
 
   try {
-    const events = await getCalendarEvents(access_token, refresh_token)
+    const events = await getCalendarEvents(access_token, refresh_token, director.calendar_id || 'primary')
 
     const upsertData = events.map((event) => {
       // All-day events only have a `date` (YYYY-MM-DD), not `dateTime`.
@@ -76,7 +78,7 @@ export async function GET(request: Request) {
     if (upsertData.length > 0) {
       await supabase
         .from('calendar_events')
-        .upsert(upsertData, { onConflict: 'google_event_id' })
+        .upsert(upsertData, { onConflict: 'director_id,google_event_id' })
     }
 
     return NextResponse.json({ synced: upsertData.length })

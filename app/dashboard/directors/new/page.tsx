@@ -20,6 +20,7 @@ export default function NewDirectorPage() {
     email: '',
     title: '',
     company: '',
+    calendar_id: '',
   })
 
   function handleChange(e: React.ChangeEvent<HTMLInputElement>) {
@@ -45,6 +46,7 @@ export default function NewDirectorPage() {
         email: form.email || null,
         title: form.title || null,
         company: form.company || null,
+        calendar_id: form.calendar_id || null,
       })
       .select()
       .single()
@@ -121,6 +123,21 @@ export default function NewDirectorPage() {
                 onChange={handleChange}
                 placeholder="Acme Inc."
               />
+            </div>
+            <div className="space-y-2">
+              <Label htmlFor="calendar_id">Google Calendar ID</Label>
+              <Input
+                id="calendar_id"
+                name="calendar_id"
+                value={form.calendar_id}
+                onChange={handleChange}
+                placeholder="director@company.com"
+              />
+              <p className="text-xs text-muted-foreground">
+                The calendar to sync meetings from. Usually the director&apos;s email address.
+                It must be shared with your connected Google account (Settings → sharing → &quot;See all event details&quot;).
+                Leave blank to use your own primary calendar.
+              </p>
             </div>
             <div className="flex gap-3 pt-2">
               <Button type="submit" disabled={loading}>

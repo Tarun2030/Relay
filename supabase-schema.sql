@@ -17,6 +17,7 @@ create table directors (
   email text,
   title text,
   company text,
+  calendar_id text, -- Google Calendar ID to sync for this director (defaults to the EA's primary calendar if unset)
   share_token text unique default encode(gen_random_bytes(16), 'hex'),
   created_at timestamptz default now()
 );
@@ -39,7 +40,7 @@ create table bookings (
 create table calendar_events (
   id uuid default uuid_generate_v4() primary key,
   director_id uuid references directors(id) on delete cascade not null,
-  google_event_id text unique,
+  google_event_id text,
   title text not null,
   start_time timestamptz not null,
   end_time timestamptz not null,
@@ -47,7 +48,8 @@ create table calendar_events (
   description text,
   meeting_link text,
   attendees jsonb default '[]',
-  synced_at timestamptz default now()
+  synced_at timestamptz default now(),
+  unique (director_id, google_event_id)
 );
 
 -- Projects table
@@ -85,8 +87,7 @@ create table calendar_tokens (
   ea_id uuid references eas(id) on delete cascade not null unique,
   access_token text not null,
   refresh_token text not null,
-  expiry timestamptz not null,
-  calendar_ids jsonb default '[]'
+  expiry timestamptz not null
 );
 
 -- RLS Policies

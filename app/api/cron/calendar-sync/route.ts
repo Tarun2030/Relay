@@ -39,14 +39,14 @@ export async function GET(request: Request) {
     // Get all directors for this EA
     const { data: directors } = await supabase
       .from('directors')
-      .select('id')
+      .select('id, calendar_id')
       .eq('ea_id', tokenRow.ea_id)
 
     if (!directors) continue
 
     for (const director of directors) {
       try {
-        const events = await getCalendarEvents(access_token, refresh_token)
+        const events = await getCalendarEvents(access_token, refresh_token, director.calendar_id || 'primary')
         const upsertData = events.map((event) => {
           const startRaw = event.start?.dateTime || (event.start?.date ? `${event.start.date}T00:00:00` : null) || new Date().toISOString()
           const endRaw   = event.end?.dateTime   || (event.end?.date   ? `${event.end.date}T00:00:00`   : null) || new Date().toISOString()
@@ -67,7 +67,7 @@ export async function GET(request: Request) {
         if (upsertData.length > 0) {
           await supabase
             .from('calendar_events')
-            .upsert(upsertData, { onConflict: 'google_event_id' })
+            .upsert(upsertData, { onConflict: 'director_id,google_event_id' })
           totalSynced += upsertData.length
         }
       } catch {

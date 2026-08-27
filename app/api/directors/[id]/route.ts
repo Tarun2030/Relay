@@ -25,11 +25,11 @@ export async function PUT(request: Request, { params }: { params: Promise<{ id: 
   if (!user) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
 
   const body = await request.json()
-  const { full_name, email, title, company } = body
+  const { full_name, email, title, company, calendar_id } = body
 
   const { data, error } = await supabase
     .from('directors')
-    .update({ full_name, email, title, company })
+    .update({ full_name, email, title, company, calendar_id: calendar_id || null })
     .eq('id', id)
     .eq('ea_id', user.id)
     .select()

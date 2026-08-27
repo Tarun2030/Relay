@@ -16,6 +16,7 @@ export interface Director {
   email?: string
   title?: string
   company?: string
+  calendar_id?: string
   share_token: string
   created_at: string
 }
@@ -33,6 +34,19 @@ export interface Booking {
   updated_at: string
 }
 
+// NOTE ON TIMES + TIMEZONES
+// Every location-bound time below (flight departure/arrival, event start/end,
+// cab pickup, restaurant reservation) is stored together with an IANA timezone
+// name (e.g. "Asia/Dubai", "Europe/London") describing the place that time
+// belongs to. The time string itself may be either:
+//   - a true instant with an explicit UTC offset ("2026-09-06T02:30:00+04:00"),
+//     which is what lib/claude.ts asks the email parser to emit, or
+//   - a naive wall-clock string ("2026-09-06T02:30"), which is what the
+//     datetime-local inputs in components/booking-form.tsx produce.
+// lib/utils.ts's formatTimeInZone / formatDateTimeInZone handle both and always
+// render the wall-clock time at the location, never the viewer's timezone.
+// The *_timezone fields are optional so bookings created before this existed
+// keep working (they fall back to viewer-local formatting).
 export interface FlightDetails {
   flight_number: string
   airline: string
@@ -40,6 +54,10 @@ export interface FlightDetails {
   destination: string
   departure_time: string
   arrival_time: string
+  /** IANA timezone of the origin airport, e.g. "Asia/Dubai" */
+  departure_timezone?: string
+  /** IANA timezone of the destination airport, e.g. "Europe/London" */
+  arrival_timezone?: string
   pnr: string
   seat?: string
   class?: string
@@ -67,6 +85,8 @@ export interface EventDetails {
   city: string
   start_time: string
   end_time?: string
+  /** IANA timezone of the venue, applies to both start_time and end_time */
+  timezone?: string
   ticket_number?: string
   seat?: string
   dress_code?: string
@@ -78,6 +98,8 @@ export interface CabDetails {
   pickup_location: string
   drop_location: string
   pickup_time: string
+  /** IANA timezone of the pickup location */
+  timezone?: string
   booking_id?: string
   driver_name?: string
   driver_contact?: string
@@ -87,6 +109,8 @@ export interface RestaurantDetails {
   restaurant_name: string
   location: string
   reservation_time: string
+  /** IANA timezone of the restaurant location */
+  timezone?: string
   party_size: number
   confirmation_number?: string
   notes?: string

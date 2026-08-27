@@ -43,7 +43,7 @@ export default function DirectorDetailPage({ params }: { params: { id: string } 
   const [syncing, setSyncing] = useState(false)
   const [copied, setCopied] = useState(false)
   const [editingInfo, setEditingInfo] = useState(false)
-  const [directorForm, setDirectorForm] = useState({ full_name: '', email: '', title: '', company: '' })
+  const [directorForm, setDirectorForm] = useState({ full_name: '', email: '', title: '', company: '', calendar_id: '' })
   const [deletingDirector, setDeletingDirector] = useState(false)
   const [emailText, setEmailText] = useState('')
   const [parsingEmail, setParsingEmail] = useState(false)
@@ -72,6 +72,7 @@ export default function DirectorDetailPage({ params }: { params: { id: string } 
         email: dirRes.data.email || '',
         title: dirRes.data.title || '',
         company: dirRes.data.company || '',
+        calendar_id: dirRes.data.calendar_id || '',
       })
       setEa(eaRes.data)
       setBookings(bookRes.data || [])
@@ -518,6 +519,17 @@ export default function DirectorDetailPage({ params }: { params: { id: string } 
                     <Label className="text-xs">Company</Label>
                     <Input value={directorForm.company} onChange={(e) => setDirectorForm((f) => ({ ...f, company: e.target.value }))} />
                   </div>
+                  <div className="space-y-1">
+                    <Label className="text-xs">Google Calendar ID</Label>
+                    <Input
+                      value={directorForm.calendar_id}
+                      onChange={(e) => setDirectorForm((f) => ({ ...f, calendar_id: e.target.value }))}
+                      placeholder="director@company.com"
+                    />
+                    <p className="text-xs text-muted-foreground">
+                      Must be shared with your connected Google account. Leave blank to use your own primary calendar.
+                    </p>
+                  </div>
                   <Button variant="outline" size="sm" className="w-full" onClick={() => setEditingInfo(false)}>
                     Cancel
                   </Button>
@@ -546,6 +558,10 @@ export default function DirectorDetailPage({ params }: { params: { id: string } 
                       <dd>{director.company}</dd>
                     </div>
                   )}
+                  <div>
+                    <dt className="text-xs text-muted-foreground">Google Calendar ID</dt>
+                    <dd>{director.calendar_id || <span className="text-muted-foreground">Not set (using primary)</span>}</dd>
+                  </div>
                 </dl>
               )}
             </CardContent>
