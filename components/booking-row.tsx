@@ -5,7 +5,19 @@ import { Pencil, Trash2 } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import { Badge } from '@/components/ui/badge'
 import type { Booking, FlightDetails, HotelDetails, EventDetails, CabDetails, RestaurantDetails } from '@/types'
-import { bookingTypeColors, bookingStatusColors, formatDate, formatDateTime, formatTime, isPast, cn } from '@/lib/utils'
+import {
+  bookingTypeColors, bookingStatusColors, formatDate,
+  formatDateTimeInZone, formatTimeInZone, shortTimeZoneLabel,
+  isPast, cn,
+} from '@/lib/utils'
+
+// Subtle parenthetical naming the city whose clock a time is shown on. Inherits
+// the row's existing muted styling — no new visual weight.
+function ZoneHint({ tz }: { tz?: string }) {
+  const label = shortTimeZoneLabel(tz)
+  if (!label) return null
+  return <span className="opacity-70"> ({label})</span>
+}
 
 interface BookingRowProps {
   booking: Booking
@@ -22,7 +34,14 @@ function BookingDetails({ booking }: { booking: Booking }) {
       <div className="text-sm text-muted-foreground flex flex-wrap gap-x-4 gap-y-1 mt-1">
         <span className="font-medium text-foreground">{f.origin} → {f.destination}</span>
         <span>{f.airline} {f.flight_number}</span>
-        <span>{formatTime(f.departure_time)} → {formatTime(f.arrival_time)}</span>
+        {/* Departure renders in the origin airport's timezone, arrival in the destination's */}
+        <span>
+          {formatTimeInZone(f.departure_time, f.departure_timezone)}
+          <ZoneHint tz={f.departure_timezone} />
+          {' → '}
+          {formatTimeInZone(f.arrival_time, f.arrival_timezone)}
+          <ZoneHint tz={f.arrival_timezone} />
+        </span>
         <span>PNR: <span className="font-mono">{f.pnr}</span></span>
         {f.seat && <span>Seat: {f.seat}</span>}
         {f.class && <span>{f.class}</span>}
@@ -48,7 +67,7 @@ function BookingDetails({ booking }: { booking: Booking }) {
       <div className="text-sm text-muted-foreground flex flex-wrap gap-x-4 gap-y-1 mt-1">
         <span className="font-medium text-foreground">{e.event_name}</span>
         <span>{e.venue}, {e.city}</span>
-        <span>{formatDateTime(e.start_time)}</span>
+        <span>{formatDateTimeInZone(e.start_time, e.timezone)}<ZoneHint tz={e.timezone} /></span>
         {e.dress_code && <span>Dress: {e.dress_code}</span>}
       </div>
     )
@@ -60,7 +79,7 @@ function BookingDetails({ booking }: { booking: Booking }) {
       <div className="text-sm text-muted-foreground flex flex-wrap gap-x-4 gap-y-1 mt-1">
         <span>{c.provider}</span>
         <span className="font-medium text-foreground">{c.pickup_location} → {c.drop_location}</span>
-        <span>{formatDateTime(c.pickup_time)}</span>
+        <span>{formatDateTimeInZone(c.pickup_time, c.timezone)}<ZoneHint tz={c.timezone} /></span>
         {c.booking_id && <span>ID: <span className="font-mono">{c.booking_id}</span></span>}
       </div>
     )
@@ -72,7 +91,7 @@ function BookingDetails({ booking }: { booking: Booking }) {
       <div className="text-sm text-muted-foreground flex flex-wrap gap-x-4 gap-y-1 mt-1">
         <span className="font-medium text-foreground">{r.restaurant_name}</span>
         <span>{r.location}</span>
-        <span>{formatDateTime(r.reservation_time)}</span>
+        <span>{formatDateTimeInZone(r.reservation_time, r.timezone)}<ZoneHint tz={r.timezone} /></span>
         <span>{r.party_size} guests</span>
         {r.confirmation_number && <span>Conf: <span className="font-mono">{r.confirmation_number}</span></span>}
       </div>

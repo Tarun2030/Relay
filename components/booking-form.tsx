@@ -30,6 +30,21 @@ const STATUS_OPTIONS: { value: BookingStatus; label: string }[] = [
   { value: 'cancelled', label: 'Cancelled' },
 ]
 
+// Timezone input for a location-bound time. Deliberately a plain text Input
+// matching the rest of this form — a full timezone picker widget would be out of
+// place here and nothing else in the app has one. Defined at module scope so it
+// isn't remounted (and doesn't lose focus) on every keystroke.
+function TimezoneField({
+  label, value, onChange,
+}: { label: string; value: string; onChange: (v: string) => void }) {
+  return (
+    <div className="space-y-2">
+      <Label>{label}</Label>
+      <Input value={value} onChange={(e) => onChange(e.target.value)} placeholder="Asia/Dubai" />
+    </div>
+  )
+}
+
 export function BookingForm({ directorId, booking, onSave, onClose }: BookingFormProps) {
   const [type, setType] = useState<BookingType>(booking?.type || 'flight')
   const [status, setStatus] = useState<BookingStatus>(booking?.status || 'confirmed')
@@ -44,6 +59,29 @@ export function BookingForm({ directorId, booking, onSave, onClose }: BookingFor
   function setDetail(key: string, value: string | number) {
     setDetails((prev) => ({ ...prev, [key]: value }))
   }
+
+  // STORAGE DESIGN — naive wall-clock + IANA zone name.
+  // <input type="datetime-local"> hands us a timezone-naive "YYYY-MM-DDTHH:mm"
+  // string. We deliberately store that string exactly as typed (departure_time,
+  // start_time, pickup_time, ...) and store the place's IANA zone separately in
+  // the matching *_timezone / timezone field, rather than converting to a UTC
+  // instant here. Reasons: (a) the EA types the wall-clock time printed on the
+  // confirmation, so storing those exact digits is lossless and round-trips back
+  // into this form on edit with no conversion; (b) it stays correct even if the
+  // zone field is filled in after the time field. The display layer
+  // (formatTimeInZone / formatDateTimeInZone in lib/utils.ts) reads a naive
+  // string as already-local to the stored zone, and separately handles the
+  // offset-bearing ISO strings the email parser produces — so both producers
+  // render the same correct wall-clock time at the location.
+
+  // Convenience wrapper so each timezone field is a one-liner below.
+  const tzField = (label: string, field: string) => (
+    <TimezoneField
+      label={label}
+      value={details[field] as string || ''}
+      onChange={(v) => setDetail(field, v)}
+    />
+  )
 
   async function handleSubmit(e: React.FormEvent) {
     e.preventDefault()
@@ -147,6 +185,12 @@ export function BookingForm({ directorId, booking, onSave, onClose }: BookingFor
                   <Label>Arrival *</Label>
                   <Input type="datetime-local" value={details.arrival_time as string || ''} onChange={(e) => setDetail('arrival_time', e.target.value)} required />
                 </div>
+              </div>
+              {/* Local time at each airport — without these the two ends of the leg
+                  would render in whatever timezone the viewer happens to be in. */}
+              <div className="grid grid-cols-2 gap-3">
+                {tzField('Departure Timezone', 'departure_timezone')}
+                {tzField('Arrival Timezone', 'arrival_timezone')}
               </div>
               <div className="space-y-2">
                 <Label>PNR *</Label>
@@ -255,6 +299,8 @@ export function BookingForm({ directorId, booking, onSave, onClose }: BookingFor
                   <Input type="datetime-local" value={details.end_time as string || ''} onChange={(e) => setDetail('end_time', e.target.value)} />
                 </div>
               </div>
+              {/* One zone for the venue — covers both start and end time */}
+              {tzField('Venue Timezone', 'timezone')}
               <div className="grid grid-cols-2 gap-3">
                 <div className="space-y-2">
                   <Label>Ticket #</Label>
@@ -294,6 +340,7 @@ export function BookingForm({ directorId, booking, onSave, onClose }: BookingFor
                 <Label>Pickup Time *</Label>
                 <Input type="datetime-local" value={details.pickup_time as string || ''} onChange={(e) => { setDetail('pickup_time', e.target.value); setDate(e.target.value.split('T')[0]) }} required />
               </div>
+              {tzField('Pickup Timezone', 'timezone')}
               <div className="grid grid-cols-2 gap-3">
                 <div className="space-y-2">
                   <Label>Booking ID</Label>
@@ -331,6 +378,7 @@ export function BookingForm({ directorId, booking, onSave, onClose }: BookingFor
                   <Input type="number" min="1" value={details.party_size as number || ''} onChange={(e) => setDetail('party_size', parseInt(e.target.value))} required />
                 </div>
               </div>
+              {tzField('Restaurant Timezone', 'timezone')}
               <div className="space-y-2">
                 <Label>Confirmation #</Label>
                 <Input value={details.confirmation_number as string || ''} onChange={(e) => setDetail('confirmation_number', e.target.value)} />

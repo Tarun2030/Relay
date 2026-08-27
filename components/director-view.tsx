@@ -10,7 +10,10 @@ import type {
   FlightDetails, HotelDetails, EventDetails, CabDetails, RestaurantDetails,
 } from '@/types'
 import {
-  formatDate, formatDateTime, formatTime, formatRelative,
+  // formatTime here stays viewer-local on purpose: it only renders synced
+  // Google Calendar meetings, where the viewer's own clock is the right frame.
+  formatDate, formatTime, formatRelative,
+  formatTimeInZone, formatDateTimeInZone, shortTimeZoneLabel,
   isPast, isWithinNextDays, cn,
 } from '@/lib/utils'
 import { ExternalLink, ChevronDown, MapPin } from 'lucide-react'
@@ -218,6 +221,15 @@ function MetaItem({ label, value, mono = false }: { label: string; value?: strin
   )
 }
 
+// Subtle hint for which city's clock a time is being shown on. Reuses the same
+// muted gray-400 tone as the other secondary metadata on these cards, and
+// inherits the surrounding text size so it never competes with the time itself.
+function ZoneHint({ tz }: { tz?: string }) {
+  const label = shortTimeZoneLabel(tz)
+  if (!label) return null
+  return <span className="ml-1 font-normal text-gray-400">{label}</span>
+}
+
 // ─── Props ─────────────────────────────────────────────────────────────────────
 interface DirectorViewProps {
   director: Director
@@ -388,8 +400,13 @@ export function DirectorView({
                         <>
                           <p className="text-sm font-bold text-gray-900 tracking-tight">{f.origin} → {f.destination}</p>
                           <div className="flex flex-wrap items-center gap-x-3 mt-1">
+                            {/* Each end of the leg renders in its own airport's timezone */}
                             <span className="text-xs font-semibold text-blue-600">
-                              {formatTime(f.departure_time)} → {formatTime(f.arrival_time)}
+                              {formatTimeInZone(f.departure_time, f.departure_timezone)}
+                              <ZoneHint tz={f.departure_timezone} />
+                              {' → '}
+                              {formatTimeInZone(f.arrival_time, f.arrival_timezone)}
+                              <ZoneHint tz={f.arrival_timezone} />
                             </span>
                             <span className="text-xs text-gray-400">{formatDate(b.date)}</span>
                             <span className="text-xs text-gray-400">{f.airline}</span>
@@ -515,7 +532,10 @@ export function DirectorView({
                     <>
                       <p className="text-sm font-bold text-gray-900">{e.event_name}</p>
                       <div className="flex flex-wrap items-center gap-x-3 mt-1">
-                        <span className="text-xs font-semibold text-orange-600">{formatDateTime(e.start_time)}</span>
+                        <span className="text-xs font-semibold text-orange-600">
+                          {formatDateTimeInZone(e.start_time, e.timezone)}
+                          <ZoneHint tz={e.timezone} />
+                        </span>
                         <span className="text-xs text-gray-400">{e.city}</span>
                       </div>
                     </>
@@ -548,7 +568,10 @@ export function DirectorView({
                     <>
                       <p className="text-sm font-bold text-gray-900">{c.pickup_location} → {c.drop_location}</p>
                       <div className="flex flex-wrap items-center gap-x-3 mt-1">
-                        <span className="text-xs font-semibold text-teal-600">{formatDateTime(c.pickup_time)}</span>
+                        <span className="text-xs font-semibold text-teal-600">
+                          {formatDateTimeInZone(c.pickup_time, c.timezone)}
+                          <ZoneHint tz={c.timezone} />
+                        </span>
                         <span className="text-xs text-gray-400">{c.provider}</span>
                       </div>
                     </>
@@ -580,7 +603,10 @@ export function DirectorView({
                     <>
                       <p className="text-sm font-bold text-gray-900">{r.restaurant_name}</p>
                       <div className="flex flex-wrap items-center gap-x-3 mt-1">
-                        <span className="text-xs font-semibold text-pink-600">{formatDateTime(r.reservation_time)}</span>
+                        <span className="text-xs font-semibold text-pink-600">
+                          {formatDateTimeInZone(r.reservation_time, r.timezone)}
+                          <ZoneHint tz={r.timezone} />
+                        </span>
                         <span className="text-xs text-gray-400">{r.location}</span>
                         <span className="text-xs text-gray-400">{r.party_size} guests</span>
                       </div>
